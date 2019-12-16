@@ -1,0 +1,39 @@
+---
+title: "Homework assignment"
+output: pdf_document
+Author: Anish Shah
+---
+
+The caption of the figure which should help you recreate it from the datasets is: “Figure. Mean optic nerve size vs. age in patients with optic nerve hypoplasia (ONH) and controls. Linear regression of the mean optic nerve size of controls (black points: individual control optic nerve measurements, black line: mean optic nerve size of controls, dashed black lines: 95% prediction intervals of mean optic nerve size of controls). Red points are measurements of optic nerves with clinical ONH. Blue points represent the clinically unaffected eye of patients with clinically unilateral ONH. The contralateral optic nerve of ONH patients was generally smaller than control optic nerves.”
+
+There are two datasets. Dataset onhlong contains the individual measurements on each row. case tells us whether the patient was a case or not (factor: 1 vs. 0), clinhypo if the nerve was clinically hypoplastic (factor: Yes vs. No), age of the subject, and mean the mean optic nerve measurement. Dataset onhfit contains predicted values for the regression line mean and the upper (upr95) and lower (lwr95). Each would be plotted by onhfit’s age variable to create the lines.
+
+```{r, fig.width = 7}
+# Source the libraries
+source("0_libraries.R")
+
+# Datasets
+df <- as_tibble(onhlong)
+df_reg <- as_tibble(onhfit)
+m <- lm(df_reg$mean ~ df_reg$age)
+mUpper <- lm(df_reg$upr95 ~ df_reg$age)
+mLower <- lm(df_reg$lwr95 ~ df_reg$age)
+
+# Plot the graph
+plot(df$age, df$mean, 
+     xlim = c(0, 20), 
+     ylim = c(0, 4),
+     xlab = "Age (years)", 
+     ylab = "Mean optic nerve size (mm)",
+     pch = 19, 
+     col = ifelse(
+       df$case == 0, "black", ifelse(
+         df$case == 1 & df$clinhypo == "Yes", "red", ifelse(
+           df$case == 1 & df$clinhypo == "No", "blue", NA
+         ))))
+abline(m)
+abline(mUpper, lty = 2)
+abline(mLower, lty = 2)
+title(sub = "Figure. Mean optic nerve size vs. age in patients with optic nerve hypoplasia (ONH) and controls")
+```
+

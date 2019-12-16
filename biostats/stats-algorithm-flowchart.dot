@@ -1,0 +1,80 @@
+#!/usr/bin/env Rscript
+
+# Biostats presentation flowchart
+
+digraph {
+	
+# Graph settings
+graph [layout = dot, rankdir = LR, overlap = FALSE, fontname = "Arial"]
+edge [fontname = "Arial", penwidth = 2];
+node [shape = rectangle, fontname = "Arial"]
+
+# Important factors
+IV [label = <IV>]
+
+# IV Types
+ONE [label = <One>]
+TWO [label = <Two>]
+PAIR [label = <Paired>]
+MANY [label = <Multiple>]
+CONT [label = <Continuous>]
+
+# Statistical tests
+ONEST [label = <One Sample T>]
+TWOST [label = <Two Sample T>]
+PT [label = <Paired T>]
+WSR [label = <Wilcoxon Signed Rank>]
+WRS [label = <Wilcoxon Rank Sum>]
+ANOVA [label = <One Way ANOVA>]
+SLR [label = <Simple Linear Regression>]
+MLR [label = <Multiple Linear Regression>]
+LOG [label = <Logistic Regression>]
+CSH [label = <Chi-Square of Homogeneity>]
+CSI [label = <Chi-Square of Independence>]
+FISH [label = <Fisher Exact>]
+
+# Rank order
+{rank = same ONEST TWOST PT WSR WRS ANOVA SLR MLR LOG CSH CSI FISH}
+{rank = same ONE TWO PAIR MANY CONT}
+{rank = same TWODV MANYDV PAIRDV CONTDV}
+{rank = same ONECONT ONECAT TWOCONT TWOCAT PAIRCONT PAIRCAT MANYCONT MANYCAT CONTCONT CONTCAT}
+
+# Relationships
+IV -> {ONE, TWO, PAIR, MANY, CONT}
+
+ONECONT [label = <Cont>]
+ONECAT [label = <Cat>]
+ONE -> {ONECONT, ONECAT}
+ONECONT -> ONEST
+ONECONT -> WSR [label = <Skewed>, style = dashed]
+ONECAT -> CSI
+
+TWODV [label = <DV>]
+TWOCONT [label = <Cont>]
+TWOCAT [label = <Cat>]
+TWO -> TWODV -> {TWOCONT, TWOCAT}
+TWOCONT -> TWOST
+TWOCONT -> WRS [label = <Skewed>, style = dashed]
+TWOCAT -> {CSH, FISH}
+
+PAIRDV [label = <DV>]
+PAIRCONT [label = <Cont>]
+PAIRCAT [label = <Cat>]
+PAIR -> PAIRDV -> {PAIRCONT, PAIRCAT}
+PAIRCONT -> PT
+
+MANYDV [label = <DV>]
+MANYCONT [label = <Cont>]
+MANYCAT [label = <Cat>]
+MANY -> MANYDV -> {MANYCONT, MANYCAT}
+MANYCONT -> ANOVA
+MANYCAT -> {CSH, FISH}
+
+CONTDV [label = <DV>]
+CONTCONT [label = <Cont>]
+CONTCAT [label = <Cat>]
+CONT -> CONTDV -> {CONTCONT, CONTCAT}
+CONTCONT -> {SLR, MLR}
+CONTCAT -> LOG
+
+}
