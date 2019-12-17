@@ -18,7 +18,7 @@ Blood-pressure measurements taken on the left and right arms of a person are ass
 
 The most appropriate procedure for testing whether or not the two arms give comparable results is:
 
-__One Sample T-test__ based on M&M guidelines for $N \geq 40$.
+__Paired T-test__ based on M&M guidelines for $N \geq 40$. This is essentially a one-sample T-test of the difference between arms (as defined by the SAS procedure as well).
 
 # Question 2
 
@@ -61,7 +61,7 @@ __Chi-square test of homogeneity__ as there are two independent random samples f
 
 A microbiologist measured the growth of two strains of a bacterium – a mutant strain and a non-mutant strain – using mouse cells in petri dishes.  Nine randomly selected mice were used.  Nine pairs of petri dishes were used.  Within each pair of dishes, cells from the same mouse were used; in one of the dishes, the mouse’s cells were exposed to the non-mutant strain, in the other dish the same mouse’s cells were exposed to the mutant strain.  Hence, the data were paired by mouse.  The sample results are shown below.  Each number in the second and third columns represents the total growth in 24 hours of the bacteria in a single dish.  A priori, the researcher suspected that the mutant strain would grow faster. Test, at $\alpha = 0.05$, whether the researcher’s suspicion is true. All populations involved can be assumed to be normally distributed. 
 
-__Hypothesis__ 
+__Hypothesis and Parameters__: 
 
 H~0~: $\mu = 0$  
 H~1~: $\mu > 0$  
@@ -92,10 +92,12 @@ _We have sufficient evidence that we should reject the null hypothesis._ The sci
 
 A major court case on the health effects of drinking contaminated water took place in the town of Woburn, MA. A town well in Woburn was contaminated by industrial chemicals. During the period that residents drank water from this well, there were 16 birth defects among 414 births. In years when the contaminated well was shut off and water was supplied from other wells, there were 5 birth defects among 228 births. The plaintiffs suing the firm responsible for the contamination claimed that these data showed that the proportion of birth defects was higher when the contaminated well was in use. Was the true proportion of birth defects higher when the contaminated well was in use?  Perform the appropriate hypothesis test at the $\alpha = 0.05$ level.
 
-__Hypothesis__ 
+__Hypothesis and Parameters__:
 
 H~0~: $p~1~ - p~2~ = 0$  
 H~A~: $p~1~ - p~2~ \neq 0$  
+p~1~ = population that drank from old/contaminated well water  
+p~2~ = population that drank from new/not-contaminated well water  
 
 __Test__: 
 
@@ -108,7 +110,7 @@ There are two independent samples that meet a normal distribution by CTL and M&M
 __Test Statistic__: 
 
 Calculated by SAS.  
-$\Chi{^2} = 1.2987$ 
+$\chi = 1.2987$ 
 
 __P-value__:
 
@@ -130,8 +132,56 @@ Researchers studied the effect of dietary supplementation of calcium on blood zi
 1. Perform descriptive/inferential statistics
 1. Save or attach SAS code
 
+a. Do there appear to be extreme outliers or implausible data?
+
+__NO__
+
+b. Provide following information for the variable DIFF?
+
+Mean: 0.076  
+Median: 0.055  
+Skewness: 0.1272  
+Standard Deviation: 0.3210  
+Interquartile Range: 0.4650  
+Kurtosis: -0.6228  
+
+The histogram created to assess normality of DIFF appears to show a bell-shaped distribution, and is visually normal. The probability plot of DIFF shows a mostly linear/normal pattern as well.
+
+90% Confidence Interval for true average DIFF: [-0.0481, 0.2001]  
+90% Confidence Interval for true average DIFF for female rats: [-0.0887, 0.2707]  
+90% Confidence Interval for true average DIFF for male rats: [-0.1406, 0.2626]  
+
+
+c. Describe the distribution of DIFF by overall and sex?
+
+The distribution of hte overall DIFF appears to be normal in pattern by histogram and probability plot. However, when analyzing by sex subsets, the sample size is much smaller and the histograms do not appear to be normal visually. For female rats, teh distribution is ever so slightly left skewed, while hte data almost appears bimodal in the distribution of just male rats (however this is all likely from random error as the sample is just 10 in each subgroup).
 
 # Question 9
+
+In an exercise physiology study, the relationship between oxygen consumption (the dependent variable) and several potential predictors of oxygen consumption was to be studied. In a random sample of 31 subjects, the following variables were measured:
+
+- Oxygen consumption (% of available oxygen consumed, as measured during 1.5 mile treadmill run. The more fit a person is, the greater their oxygen consumption will be during physical activity)
+- Sex (M, F)
+- Age (years)
+- Weight (kg)
+- Run time (time, in minutes, taken to run 1.5 miles on treadmill)
+- Maximum pulse (highest pulse rate during the run)
+- Performance (a subjective measure of the subject’s fitness, assigned by an interviewer; larger values mean the subject was assessed as having a higher fitness level)
+
+The data is in a file named fitness2019, make a report of this data ($\alpha = 0.05$) with the following attributes:
+
+- table of descriptive for each variable
+- state the regression model
+- briefly describe methods used to arrive at your model
+- state estimate of model
+- report p-value for overall test for model
+- report a measure of fit of the model
+- report p-values for the partial tests for the model
+- report key results of any diagnostic work performed for the model
+- include short/clear/well-written summary describing any significant relationships
+- cut/paste objects must be discussed in your report
+
+The files and code describing this processed are attached.
 
 # Question 10
 
