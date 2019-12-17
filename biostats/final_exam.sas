@@ -125,17 +125,19 @@ ODS RTF FILE="H:\My Documents\Github\mscr\biostats\final_exam.rtf";
 * Import data;
 PROC IMPORT OUT = WORK.fit
 	DATAFILE = "H:\My Documents\Github\mscr\biostats\fitness2019.xlsx"
-	DBMS = xlsx REPLACE;
+	DBMS = XLSX REPLACE;
 	GETNAMES = YES;
 RUN;
 
 * Check contents;
 PROC CONTENTS DATA = WORK.fit;
+PROC PRINT DATA = WORK.fit (OBS = 10);
 RUN;
+
 
 *** Descriptive analysis;
 
-* Frequency data;
+* Continuous data;
 PROC UNIVARIATE DATA = WORK.fit;
 	VAR Age Maximum_Pulse Oxygen_Consumption 
 Performance RunTime Weight;
@@ -144,25 +146,74 @@ Performance RunTime Weight;
 	HISTOGRAM Maximum_Pulse Performance RunTime;
 RUN;
 
-* Means and skew of data;
-PROC MEANS DATA = H.senic2;
-	VAR facility prob_inf;
+* Categorical data;
+PROC FREQ DATA = WORK.fit;
+	TABLE Sex;
 RUN;
 
-*** B. Scatter plots;
-PROC SGSCATTER DATA = H.senic2;
-	PLOT prob_inf * facility;
+* Scatter of the data;
+PROC SGPLOT DATA = WORK.fit;
+	SCATTER y = Oxygen_Consumption x = Age;
+PROC SGPLOT DATA = WORK.fit;
+	SCATTER y = Oxygen_Consumption x = Maximum_Pulse;
+PROC SGPLOT DATA = WORK.fit;
+	SCATTER y = Oxygen_Consumption x = Performance;
+PROC SGPLOT DATA = WORK.fit;
+	SCATTER y = Oxygen_Consumption x = RunTime;
 RUN;
 
-*** C.  Correlation;
-PROC CORR DATA = H.senic2;
-	VAR prob_inf;
-	WITH facility;
+* Correlation;
+PROC CORR DATA = WORK.fit;
+	VAR Oxygen_Consumption;
+	WITH Age Maximum_Pulse Performance RunTime;
 RUN;
 
-*** D. Regression model;
-PROC REG CORR DATA = H.senic2;
-	MODEL prob_inf = facility; 
+/* Correlation patterns based on plot and corr data
+Age not super strong
+Max pulse not super strong
+Performance and Runtime are very tight (rho ~ 0.8, although runtime is negative)
+*/
+
+* Inference about sex.
+Appears signficant by group
+Likely good to include as covariate;
+PROC SORT DATA = WORK.fit;
+	BY Sex;
+PROC BOXPLOT DATA = WORK.fit;
+	PLOT Oxygen_Consumption*Sex / CBOXES = black;
+PROC TTEST;
+	CLASS Sex;
+	VAR Oxygen_Consumption;
 RUN;
-	
+
+* Recode gender to 0 and 1s;
+DATA WORK.fit;
+	SET WORK.fit;
+	IF Sex = 'F' THEN NumSex = 0;
+	ELSE IF Sex = 'M' THEN NumSex = 1;
+RUN;
+
+* Simple Regression models;
+PROC REG CORR DATA = WORK.fit;
+	MODEL Oxygen_Consumption = Age; 
+	MODEL Oxygen_Consumption = Maximum_Pulse;
+	MODEL Oxygen_Consumption = Performance;
+	MODEL Oxygen_Consumption = RunTime;
+	MODEL Oxygen_Consumption = NumSex;
+RUN;
+
+/*
+Which variables to include?
+Age not good fit
+Max Pulse not a good fit
+Performance is correlated! However is subjective, prone to bias
+RunTime is correlated!
+Sex is t-test significant, but cannot assess linearity
+*/
+
+* Multiple linear regressions;
+PROC REG CORR DATA = WORK.fit;
+	MODEL Oxygen_Consumption = NumSex Age RunTime / clb;
+RUN;
+
 ODS RTF CLOSE;
