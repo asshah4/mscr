@@ -25,28 +25,29 @@
 to use it within SAS datasetps and procedures.
 
 Therefore, create a SAS library on your desktop named 'Popstar';
-libname popstar "C: ????????????????";
+libname H "H:\My Documents\Github\mscr\analytical-modeling\";
 
 *In oder for SAS datasets to be used, they have to be in referred to in a 
 library or a temporary folder 'work';
 
 *Perform a proc contents procedure to make sure the data was read correctly
 in the libname statement;
-proc contents data=???????????????; 
+proc contents data=H.tbantigen;
 run;
 
-*
-*How many variables are included in TBantigen? 
-*How many observations are included in TBantigen?   
+
+*How many variables are included in TBantigen? 6
+*How many observations are included in TBantigen? 4958
 
 
 *Next, use a data statement to create a temporary SAS dataset from 
 the permanent dataset TBantigen.
 *Call the temporary dataset 'one';
 
-data one;
-set ?????????;
-run;
+DATA one;
+	SET H.TBantigen;
+RUN;
+
 *check the log to ensure the new temporary dataset was created. 
 What is the full name of the new temporary dataset? 
 
@@ -55,13 +56,16 @@ The new variable 'ant_high' should dichotomize the continuous variable LBXTBA as
 Code a high response to be TB antigen response >= 10 IU/mL;
 
 *First double check the distribution of the continuous variable lbxtba;
-proc ????
+PROC UNIVARIATE DATA = H.TBantigen;
+	VAR lbxtba;
+RUN;
 
-data two;
-set one;
-if ??????????;
-else if ???????? then ????;
-run;
+DATA two;
+	SET one;
+	IF lbxtba >= 10 THEN ant_high = 1;
+	ELSE IF lbxtba < 10 THEN ant_high = 0;
+RUN;
+
 
 *check that the coding worked correctly;
 proc print data=two (obs=500); *proc print is useful to check that coding worked, 'obs=' statement limits the number printed;
@@ -72,6 +76,10 @@ run;
 In the same step, limit observations in the permanent dataset where participants were classified as QFT positive.
 In other words, remove those participants who were coded as LTBI negative;
 
+DATA H.lab1;
+	SET WORK.two;
+RUN;
+
 *First check coding of the LTBI variable;
 proc freq data=two;
 table lbxtbin;
@@ -79,15 +87,17 @@ run;
 
 *If LBXTBIN=2 then participants were classified as LTBI negative;
 
-data popstar.lab1;
-?????
-?????
-run;
+DATA H.lab1;
+	SET WORK.two;
+	IF lbxtbin = 2 THEN DELETE;
+RUN;
 
 *Check log to make sure datastep worked.
 How many observations does popstar.lab1 contain? 
-How many variables does popstar.lab1 contain? 
+How many variables does popstar.lab1 contain? ;
 
+PROC CONTENTS DATA = H.lab1;
+RUN;
 
 ****Last step for Part 1. 
 -Save the SAS program. 
@@ -101,25 +111,27 @@ How many variables does popstar.lab1 contain?
 *Using proc freq, create a frequency table for the relationship 
 between diabetes status and high TB antigen response.
 *Perform this comparison only among those who were LTBI positive;
-proc freq data=popstar.lab1;
-table dm*ant_high/;
-run;
+PROC FREQ DATA = H.lab1;
+	TABLE dm*ant_high;
+RUN;
+
 *Calculate (by hand) the odds ratio of high antigen comparing those 
 with diabetes to euglycemic patients.
-*Odds of high antigen with diabetes: 
+*Odds of high antigen with diabetes:  
 *Odds of high antigen with euglycemia: 
-*Odds ratio: 
+*Odds ratio: 1.53
 
 
 *Proc freq can also create odds ratios if the table is truly 2x2;
 *Rerun the proc freq  excluding those with pre-diabetes 
 using the 'where' statement;
 *Using the '/CMH' at the end of the table statement will provide the odds ratio;
-proc freq data=popstar.lab1;
-????
-????
-run;
-*confirm that the 'cmh' option produced the same OR as when calculated by hand;
+PROC FREQ DATA = H.lab1;
+	WHERE dm ~= 1;
+	TABLE dm*ant_high /CMH;
+RUN;
+
+*confirm that the 'cmh' option produced the same OR as when calculated by hand; 
 
 
 ***Next, what would happen to the OR if the coding of high antigen was switched?;
