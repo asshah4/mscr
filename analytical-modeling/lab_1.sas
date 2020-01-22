@@ -25,7 +25,7 @@
 to use it within SAS datasetps and procedures.
 
 Therefore, create a SAS library on your desktop named 'Popstar';
-libname H "H:\My Documents\Github\mscr\analytical-modeling\";
+libname H "C:\Users\asshah4\Box Sync\projects\mscr\analytical-modeling\";
 
 *In oder for SAS datasets to be used, they have to be in referred to in a 
 library or a temporary folder 'work';
@@ -68,7 +68,8 @@ RUN;
 
 
 *check that the coding worked correctly;
-proc print data=two (obs=500); *proc print is useful to check that coding worked, 'obs=' statement limits the number printed;
+proc print data=two (obs=50); *proc print is useful to check that coding worked,
+'obs=' statement limits the number printed;
 var lbxtba ant_high;
 run;
 
@@ -81,12 +82,11 @@ DATA H.lab1;
 RUN;
 
 *First check coding of the LTBI variable;
-proc freq data=two;
-table lbxtbin;
-run;
+PROC FREQ DATA = two;
+	TABLE lbxtbin;
+RUN;
 
 *If LBXTBIN=2 then participants were classified as LTBI negative;
-
 DATA H.lab1;
 	SET WORK.two;
 	IF lbxtbin = 2 THEN DELETE;
@@ -95,7 +95,6 @@ RUN;
 *Check log to make sure datastep worked.
 How many observations does popstar.lab1 contain? 
 How many variables does popstar.lab1 contain? ;
-
 PROC CONTENTS DATA = H.lab1;
 RUN;
 
@@ -104,7 +103,6 @@ RUN;
 -Close SAS, reopen it, and open the SAS program. 
 -Re-run the libname statement in the first section of Part 1
 -Perform a proc freq on any varible in the 'lab1' permanent datasets;
-
 
 ********PART 2, ODDS RATIOS WITH PROC FREQ;
 
@@ -132,7 +130,7 @@ PROC FREQ DATA = H.lab1;
 RUN;
 
 *confirm that the 'cmh' option produced the same OR as when calculated by hand; 
-
+* CMH was 1.53, exactly the ame
 
 ***Next, what would happen to the OR if the coding of high antigen was switched?;
 
@@ -140,21 +138,20 @@ RUN;
 *With ant_high2, code those with high antigen as 0 and those without as 1;
 *Rerun the proc freq table to obtain an odds ratio with the alternate coding;
 
-data three;
-set popstar.lab1;
-if ant_high=1 then ??????;
-else if ant_high=0 then ????;
-run;
-proc freq data=three;
-table dm*ant_high2/cmh;
-where dm ^=1;
-run;
-*What is the odds ratio reported from the SAS output?
+DATA three;
+	SET H.lab1;
+	IF ant_high=1 THEN ant_high2 = 0;
+	ELSE IF ant_high = 0 THEN ant_high2 = 1;
+RUN;
+
+PROC FREQ DATA = three;
+	TABLE dm*ant_high2/cmh;
+	WHERE dm ^= 1;
+RUN;
+*What is the odds ratio reported from the SAS output? 0.653
 *Interpretation of the OR depends on variable coding; 
 *As a statistical software user, it is important to 
 check results by hand;
-
-
 
 ********PART 3, BASIC LOGISTIC REGRESSION;
 
@@ -163,127 +160,136 @@ check results by hand;
 *Using Proc logistic, recalculate the odds ratios 
 (both 1.53 and 0.65) from Part 2 above.
 *With one covariate, the odds ratio should be the same as from a proc freq;
-
-proc logistic data=popstar.lab1;
-model ant_high = dm;
-run;
+PROC LOGISTIC DATA = H.lab1;
+	MODEL ant_high = dm;
+RUN;
 
 *The OR reported from the above model is 0.80. 
 *What is the interpretation of this OR?
 
+*Rerun the proc logistic procedure modeling the odds of high antigen response 
+and use a 'class' statement so SAS recognizes that DM is a categorical variable;
+PROC LOGISTIC DATA = H.lab1;
+	CLASS dm (PARAM = ref ref ='0'); *param=ref ref=0 indicates which 
+	level is modeled as the referent group;
+	MODEL ant_high (EVENT = '1') = dm;*event='1' indicates to model 
+	log odds of high antigen response;
+RUN;
 
-*Rerun the proc logistic procedure modeling the odds of high antigen response and use a 'class' statement
-so SAS recognizes that DM is a categorical variable;
-
-proc logistic data=popstar.lab1;
-class dm (param=ref ref='0'); *param=ref ref=0 indicates which level is modeled as the referent group;
-model ant_high (event='1') = dm; *event='1' indicates to model log odds of high antigen response;
-run;
 *What is the OR from the above model using the class statement?
 -The OR from proc logistic is the same as from the proc freq: 1.53;
 
 *Is the predm vs. euglycemic OR the same as derived from the proc freq?
 
-
 *Last, recreate the OR 0.65 observed from the second proc freq above (last part of Part 2;
+PROC LOGISTIC DATA = H.lab1;
+	CLASS dm (param = ref ref = '0');
+	MODEL ant_high (event = '0') = dm;
+RUN;
 
-
-proc logistic data=popstar.lab1;
-class dm (param=ref ref='0'); 
-model ant_high (event='?') = dm;
-run;
 
 ****Multiple covariate logistic regression;
 
-*The above logistic models are considered crude, unadjusted, or single predictor models;
+*The above logistic models are considered 
+crude, unadjusted, or single predictor models;
 *Adding one additonal variable makes it multivariable;
 
-*Using a data step, create a categorical variable from RIDAGEYR (continuous age), call the new
+*Using a data step, create a categorical variable 
+from RIDAGEYR (continuous age), call the new
 variable 'agecat' and use THREE-levels;
 
-*Then run a logistic model with the outcome high antigen response with both DM and agecat as categorical 
-covariates;
+*Then run a logistic model with the outcome 
+high antigen response with both DM and agecat 
+as categorical covariates;
 
 *First determine potential cutpoints for age;
-proc univariate data=popstar.lab1;
-var RIDAGEYR;
-run;
+PROC UNIVARIATE DATA = H.lab1;
+	VAR RIDAGEYR;
+RUN;
 
+DATA four;
+	SET H.lab1;
+	IF RIDAGEYR <= 45 THEN agecat = 0;
+	ELSE IF RIDAGEYR < 65 THEN agecat = 1;
+	ELSE IF RIDAGEYR >= 65 THEN agecat = 2;
+RUN;
 
-data four;
-set popstar.lab1;
-if RIDAGEYR ??? then agecat=?; 
-else if RIDAGEYR ???? and agecat ???? then agecat=?;
-else if RIDAGEYR ??? then agecat=?;
-run;
 
 *check that coding worked;
+PROC PRINT DATA = four (obs=500);
+	VAR RIDAGEYR agecat;
+RUN;
 proc print data=four (obs=500);
 var RIDAGEYR agecat;
 run;
 *Best to check the cutpoints;
-
 *Where is the mistake above?;
 
 *Now replace lab1 with a new lab1 that includes agecat (save the temporary dataset over lab1);
-data ????
-????
-run;
- 
+DATA H.lab1;
+	SET four;
+RUN; 
 
-*Now run a logistic model with the outcome high antigen response with both DM and agecat as categorical 
-covariates;
-proc logistic data=popstar.lab1;
-class dm (param=ref ref='0') agecat (param=ref ref='0');
-model ant_high (event='1') = dm agecat;
-run;
+*Now run a logistic model with the outcome high antigen response 
+with both DM and agecat as categorical covariates;
+PROC LOGISTIC DATA = H.lab1;
+	CLASS dm (param = ref ref = '0') agecat (param = ref ref = '0');
+	MODEL ant_high (event = '1') = dm agecat;
+RUN;
 
 *What is the interpretation of the odds ratio after including agecat?
+
+Very similar, it is now 1.468
 
 
 
 ********PART 4, DUMMY VARIABLES;
 
-*For categorical variables with more than 2 levels, the class statment is a convenient way to
+*For categorical variables with more than 2 levels,
+the class statment is a convenient way to
 enable proc logistic to model categorical variables. 
 
-*However, it is useful to understand that the class statement is essentially creating dummy variables
+*However, it is useful to understand that the class statement 
+is essentially creating dummy variables
 and therefore contributes to other model considerations (fit, saturation, etc).
 
 ****Re-run the adjusted logistic model from part 3 using dummy variables.
 
 *First, create dummy variables for agecat and dm;
 
-data six;
-set popstar.lab1;
-*dummy variables for DM:;
-if dm=1 then dm_1=1;
-else dm_1=0;
-if dm=2 then dm_2=1;
-else dm_2=0;
-
-*dummy variables for agecat;
-????
-???
-???
-run;
+DATA six;
+	SET H.lab1;
+	*Creating dummy variiables for DM;
+	IF dm=1 THEN dm_1 = 1;
+	ELSE dm_1 = 0;
+	IF dm = 2 THEN dm_2 = 1;
+	ELSE dm_2 = 0;
+	IF dm=0 THEN dm_0 = 1;
+	ELSE dm_0 = 0;
+	* Create dummies for agecat;
+	IF agecat = 2 THEN agecat_2 = 1;
+	ELSE agecat_2 = 0;
+	IF agecat = 1 THEN agecat_1 = 1;
+	ELSE agecat_1 = 0;
+	IF agecat = 0 THEN agecat_0 = 1;
+	ELSE agecat_0 = 0;
+RUN;
 
 *Check that recoding into dummy variables worked;
-Proc freq ???;
-???
-???;
-
+PROC FREQ DATA = six;
+	TABLE agecat_2 agecat_1 agecat_0 dm_2 dm_1 dm_0;
+RUN;
+	
 *According to proc freq, dummy varialbes look correct.
 *Copy these new dummy variables into the permanent sas dataset 'lab1';
-data ???;
-????;
-run;
+DATA H.lab1;
+	SET six;
+RUN;
 
 *Last, re-run the logistic model without the class statement;
-
-Proc logistic data=popstar.lab1;
-model ant_high (event='1')= ???????;
-run;
+PROC LOGISTIC DATA = H.lab1;
+	MODEL ant_high (event='1') = dm_2 dm_1 dm_0 agecat_2 agecat_1 agecat_0;
+RUN;
 
 *The parameter estimates and ORs should be the same as when using the class statement as in Part 3;
 *In the above example withe the class statement, the model statement only included two named 
