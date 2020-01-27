@@ -1,0 +1,102 @@
+---
+title: "MSCR 509: Homework Assignment 1"
+author: "Anish Shah, MD"
+date: "January 27, 2020"
+header-includes:
+- \usepackage{booktabs}
+output: pdf_document
+---
+
+```{r setup, global_options, include=FALSE}
+knitr::opts_chunk$set(
+	cache = TRUE,
+	warning = FALSE,
+	eval = TRUE,
+	echo = TRUE,
+	include = TRUE,
+	message = FALSE,
+	tidy = TRUE,
+	tidy.opts = list(width.cutoff = 60),
+	dpi = 600,
+	dev = "png",
+	options("scipen" = 999, "digits" = 3)
+)
+```
+
+
+# Assignment Description
+
+The treatment regimen for patients who have been diagnosed as having cancer of the prostate is crucially dependent upon whether or not the cancer has spread to the surrounding lymph nodes.  Indeed, a laparotomy (a surgical incision into the abdominal cavity) may be performed to ascertain the extent of this nodal involvement.  However, there are a number of variables that are indicative of nodal involvement that can be measured noninvasively, and the aim of a study reported by Brown (1980) was to determine whether a combination of variables could be used to forecast whether or not the cancer has spread to the lymph nodes. The response variable (Y) is the presence or absence of nodal involvement (Y: 1 = present, 0 = absent).  
+
+__The prognostic variables considered are: __
+
+- AGE -- age of patient at diagnosis (in years)
+- ACID -- level of serum acid phosphatase (in King-Armstrong units)
+- XRAY -- the result of an X-ray examination (0 = negative, 1 = positive)
+- SIZE -- the size of the tumor as determined by a rectal examination (0 = small, 1 = large)
+- GRADE -- a summary of the pathological grade of the tumor determined from a biopsy (0 = less serious, 1 = more serious)
+- SES -- income (high, middle, low)
+
+# Data intake
+
+```{r load data, include = FALSE, echo = FALSE}
+# Libraries
+source("1_libraries.R")
+
+prostate <- read_sas("prostate_data2.sas7bdat")
+```
+
+The data frame to be loaded can be seen as below, in its raw form.
+
+```{r contents of data}
+# Show first few lines
+head(prostate)
+```
+
+This will need to be modified to be _publication ready_ by adding in the appropriate labels.
+
+# Table presentation
+
+```{r, table generation, results = 'markdown'}
+# Data set
+df <- prostate
+
+## Relabel the variables for prettier data
+
+# Outcome variable
+df$y <- factor(df$y, levels = c(0,1), 
+			   labels = c("No Spread", "Lymph Node Involvment"))
+attr(df$y, "label") <- "Nodal Spread"
+
+# Age
+attr(df$age, "label") <- "Age (years)"
+
+# Acid phosphatase
+attr(df$acid, "label") <- "Acid Phosphatase (King-Armstrong units)"
+
+# Xray
+df$xray <- factor(df$xray, levels = c(0,1), 
+				  labels = c("Normal x-Ray", "Abnormal X-Ray"))
+attr(df$xray, "label") <- "X-Ray Findings"
+
+# Size
+df$size <- factor(df$size, levels = c(0,1), 
+				  labels = c("Small", "Larger"))
+attr(df$size, "label") <- "Tumor Size"
+
+# Grade
+df$grade <- factor(df$grade, levels = c(0,1), 
+				   labels = c("Less Serious Pathology", "Serious Pathology"))
+attr(df$grade, "label") <- "Pathological Grade Finding"
+
+# SES
+df$ses <- ordered(df$ses, levels = c("low", "middle", "high"),
+				  labels = c("Low SES", "Middle SES", "High SES"))
+attr(df$ses, "label") <- "Socioeconomic Class (SES)"
+
+# Correct shape of table
+compareGroups(y ~ age + acid + xray + size + grade + ses, data = df) %>%
+	createTable(., show.p.overall = TRUE) %>%
+	export2md(., size = 8, 
+				 caption = "Difference in Characteristics Between Prostate Cancer with and Without Nodal Involvement")
+```
