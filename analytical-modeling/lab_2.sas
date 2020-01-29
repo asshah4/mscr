@@ -195,7 +195,8 @@ DATA three;
 	SET two;
 	IF xpsite_nom = 1 THEN cnsother = 1; *for CNS location;
 	ELSE IF xpsite_nom = 2 THEN cnsother = 0; * for other location;
-	ELSE cnsother = .; *this should remove those with lymph locations;
+	ELSE cnsother = .; *this should remove those with 
+	lymph locations;
 RUN;
 
 *Check the coding worked and compare it to the frequency table of xpsite_nom;
@@ -218,182 +219,251 @@ This happens to just be a normal/simple logistic regression;
 
 *****PART 2.2 Mini sensitivity analysis;
 
-*Rerun the nominal model with three different ways of handling the missing in homeless;
-data three;
-set two;
+*Rerun the nominal model with three different ways 
+of handling the missing in homeless;
+DATA three;
+	SET two;
 *code a separate level for missing;
-????;
+	IF homeless = . THEN homeless_level = 2;
+	ELSE IF homeless = 1 THEN homeless_level = 1;
+	ELSE IF homeless = 0 THEN homeless_level = 0;
 
 *assume missing were not homeless;
-???;
+	IF homeless = . THEN homeless_not = 0;
+	ELSE IF homeless = 1 THEN homeless_not = 1;
+	ELSE IF homeless = 0 THEN homeless_not = 0;
 
 *assume missing were homeless;
-????;
+	IF homeless = . THEN homeless_really = 1;
+	ELSE IF homeless = 1 THEN homeless_really = 1;
+	ELSE IF homeless = 0 THEN homeless_really = 0;
 
-run;
+RUN;
 
 *Check that new coding worked;
-proc print data=three;
-var homeless home2 home3 home4;
-where homeless=.;
-run;
-proc freq data=three;
-table home4;
-run;
+PROC PRINT DATA = three;
+	VAR homeless homeless_level homeless_not homeless_really;
+	WHERE homeless = .;
+RUN;
 
-*Does the different treatment of missing homeless matter? Rerun the simple nominal LR with the 3 different 
-homeless variables;
+PROC FREQ DATA = three;
+	TABLE homeless_really;
+RUN;
 
-*now a class statment is needed for home2;
+*Does the different treatment of missing homeless matter?
+Rerun the simple nominal LR with the 3 different 
+homeless variables..
+
+- As seen, the OR for +homeless and +CNS xpsite
+for how we are managing missingness
+- for separating out missing, then OR = 1.406
+- for missing being "not homeless", then OR = 1.493
+- for missing being "really homeless", then OR = 1.005
+;
+
+*now a class statment is needed for homeless_level;
 *Model 2.3;
-proc logistic data=three;
-class home2 (param=ref ref='0'); 
-model xpsite_nom (ref='2')=home2/link=glogit; *ref= is needed to specific which outcome is the comparison group;
-run;  
-*Model 2.4;
-proc logistic data=three;
-class home3 (param=ref ref='0'); 
-model xpsite_nom (ref='2')=home3/link=glogit; *ref= is needed to specific which outcome is the comparison group;
-run;  
-*Model 2.5;
-proc logistic data=three;
-class home4 (param=ref ref='0'); 
-model xpsite_nom (ref='2')=home4/link=glogit; *ref= is needed to specific which outcome is the comparison group;
-run; 
+PROC LOGISTIC DATA = three;
+	CLASS homeless_level(PARAM=ref REF='0');
+	MODEL xpsite_nom(REF='2')=homeless_level/LINK=glogit;
+RUN; *Results not particularly significant;
 
-*If those who had missing information on homelessness were all infact truly homeless (model 2.5), 
+PROC LOGISTIC DATA = three;
+	CLASS homeless_not(PARAM=ref REF='0');
+	MODEL xpsite_nom(REF='2')=homeless_not/LINK=glogit;
+RUN; *Results not particularly significant;
+
+PROC LOGISTIC DATA = three;
+	CLASS homeless_really(PARAM=ref REF='0');
+	MODEL xpsite_nom(REF='2')=homeless_really/LINK=glogit;
+RUN; *Results not particularly significant;
+
+*If those who had missing information on homelessness
+were all infact truly homeless (model 2.5), 
 the bias is substantial;
 
-*Perform a nominal logistic model (2.6) with lymphatic as the referent outcome group and 
+**Perform a nominal logistic model (2.6) with 
+lymphatic as the referent outcome group and 
 adjust for HIV status and biologic sex;
 
-*Try the model with the different categories of homeless missing. 
+*Try the model with the different categories of
+homeless missing. 
 
-If you could only chose one, which model results would you chose to report?;
+If you could only chose one, which model results 
+would you chose to report?;
 
 *Model 2.6;
-proc logistic data=three;
-class home3 (param=ref ref='0'); 
-model xpsite_nom (ref='?')=? HIV gen/link=glogit; *ref= is needed to specify which outcome is the comparison group;
-run; 
+PROC LOGISTIC DATA = three;
+	CLASS homeless (REF='0');
+	MODEL xpsite_nom(REF='0') 
+		= homeless HIV gen / LINK=glogit;
+RUN;
+
 *Model 2.7;
-proc logistic data=three;
-class homeless (param=ref ref='0'); 
-model xpsite_nom (ref='?')=? HIV gen/link=glogit; *ref= is needed to specific which outcome is the comparison group;
-run; 
+PROC LOGISTIC DATA = three;
+	CLASS homeless_not (REF='0');
+	MODEL xpsite_nom(REF='0')
+		= homeless_not HIV gen / LINK=glogit;
+RUN;
+
 *Model 2.8;
-proc logistic data=three;
-class home2 (param=ref ref='0'); 
-model xpsite_nom (ref='?')=? HIV gen/link=glogit; *ref= is needed to specify which outcome is the comparison group;
-run; 
+PROC LOGISTIC DATA = three;
+	CLASS homeless_really (REF='0');
+	MODEL xpsite_nom(REF='0') 
+		= homeless_really HIV gen / LINK=glogit;
+RUN;
 
 
-
-*************************************PART 3 ORDINAL LOGISTIC REGRESSION;
+*************PART 3 ORDINAL LOGISTIC REGRESSION;
 
 *For PART 3 use the SAS dataset named 'TBantigen';
 
 *First create a new temporary dataset to do the following: 
 
-	*1. limit the ordinal analysis (PART 3) to those with latent TB (LBXTBIN=1);
+	*1. limit the ordinal analysis (PART 3) 
+		to those with latent TB (LBXTBIN=1);
 
-	*2. create a new categorical variable for TB antigen response 
-	that is a 3-level ordinal variable, call it 'antord';
+	*2. create a new categorical variable for 
+		TB antigen response that is a 3-level 
+		ordinal variable, call it 'antord';
 
-*Determine the distribution of antigen response among those with LTBI;
-Proc freq data=matt.tbantigen;
-table lbxtba;
-where LBXTBIN=1;
-run;
-*For simplicity, choose cut points at the 33rd and 66th percentiles;
-*recall that categorical variables can be numeric in SAS (don't need to be characters);
+*Determine the distribution of antigen response 
+among those with LTBI;
+PROC FREQ DATA = H.tbantigen;
+	TABLE lbxtba;
+	WHERE lbxtbin = 1;
+RUN;
 
-data four;
-set matt.tbantigen;
-if LBXTBIN ^=1 then delete; *limit to those with LTBI;
+*For simplicity, choose cut points at 
+the 33rd and 66th percentiles;
+*recall that categorical variables can be 
+numeric in SAS (don't need to be characters);
 
-*ordinal variable for TB antigen named 'antord';
-if lbxtba <= ??? then antord=0;                       *low antigen response;
-else if lbxtba >??? and lbxtba <=???? then antord=1;  *medium antigen response;
-else if lbxtba >??? then antord=2;                    *high antigen response;
-run;
+DATA four;
+	SET H.tbantigen;
+	*Remove non-LTBI;
+	IF lbxtbin ^= 1 THEN DELETE; 
+	*Make ordinal variable "antord";
+	* Low <= 1.1 ~ 33%;
+	* Mid <= 4.5 ~ 66%;
+	* High > 4.5;
+	IF lbxtba <= 1.1 THEN antord=0; 
+	ELSE IF lbxtba > 1.1 AND lbxtba <= 4.5 THEN antord=1;
+	ELSE IF lbxtba > 4.5 THEN antord=2;
+RUN;
 
 *Check that ordinal variable is correct;
-proc sort data=four; *proc sort is useful to run before proc print (and necessary when merging datasets);
-by lbxtba;
-run;
-proc print data=four;
-var lbxtba antord;
-run;
-Proc freq data=four;
-table antord;
-run;
-*Ok, TB antigen now is now categorical, ordinal, numeric, in 3 equal groups. 
-*Equal numbers in groups is NOT necessary for ordinal logistic regresion;
+*proc sort is useful to run before proc print 
+(and necessary when merging datasets);
+PROC SORT DATA = four;
+	BY lbxtba;
+RUN;
 
-*Next run a simple ordinal logistic regression with antord as the outcome and DM as the exposure;
+PROC PRINT DATA = four;
+	VAR lbxtba antord;
+RUN;
+
+PROC FREQ DATA = four;
+	TABLE antord;
+RUN;
+
+*Ok, TB antigen now is now categorical, ordinal, numeric, 
+in 3 equal groups. 
+*Equal numbers in groups is NOT necessary for 
+ordinal logistic regresion;
+
+*Next run a simple ordinal logistic regression 
+with antord as the outcome and DM as the exposure;
 *Model 3.1;
-proc logistic data=four;
-model antord=DM;
-run;
+PROC LOGISTIC DATA = four;
+	MODEL antord = dm;
+RUN;
 
 ****Review Model 3.1 output;
-*What type of model was used? ?????;
-*Were the odds proportional? ????;
+*What type of model was used?
+- Ordinal regression;
+
+*Were the odds proportional? 
+- Yes, score test couldnt provide evidence against 
+proportional odds;
 
 *What is the interpretation of the OR?
+- OR = 0.889... decreased chance of high antigen c- DM??;
 
-*Next rerun the model 3.1 with 'DM' in the class statement;
-*Also use the descending option to change the order of the odds comparisons (odds of high vs. med/low);
+**Next rerun the model 3.1 with 'DM' in the class statement;
+*Also use the descending option to change the order of 
+the odds comparisons (odds of high vs. med/low);
 
 *Model 3.2;
-proc logistic data=four descending;
-class ????;
-model antord=DM; *'event=' and 'ref=' options no longer work here.;
-run;
-*Is the proportional odds assumption still met in model 3.2? ???;
-*Now what is the interpretation of the ORs after using the class statement for DM and the descending option?
+PROC LOGISTIC DATA = four DESCENDING;
+	CLASS dm (REF='0');
+	MODEL antord = dm;
+RUN;
+*Is the proportional odds assumption still met 
+in model 3.2?
+- Yes, Score test cannot prove odds are not proportional;
+
+*Now what is the interpretation of the ORs after 
+using the class statement for DM and the descending option?
+- Low or medium antigen has OR of 1.291 if pt has preDM 
+versus no DM
+- Low or medium antigen has OR of 1.227 if pt has DM versus
+no DM;
 ***There are four (or more) interpretations;
 
 
 
-*Can these ORs from model 3.2 be generated by a frequency table?;
-proc freq data=four;
-table antord*DM;
-run;
+*Can these ORs from model 3.2 be generated 
+by a frequency table?
+- Yes they can be, by doing odds by collapsing the strata;
+PROC FREQ DATA = four;
+	TABLE antord * dm;
+RUN;
+
 ***Odds of high antigen vs. med/low response;
 *????;
 
 ***Odds of high/medium antigen vs. low response;
 *?????
 
-*Take average of two ORs: ????;
+*Take average (or weighted strata) of two ORs: ????;
 
 
 
-*Try rerunning the ordinal model  3.2 without the descending option;
-*Recalculate the pre-DM OR estimate by hand from the frequency table;
+*Try rerunning the ordinal model  3.2 without 
+the descending option;
+*Recalculate the pre-DM OR estimate by 
+hand from the frequency table;
+
 *Model 3.3;
-proc logistic data=four ;
-class dm (Param=ref ref='0');
-model antord=DM;
-run;
-proc freq data=four;
-table antord*DM;
-run;
+PROC LOGISTIC DATA = four;
+	CLASS dm (REF='0');
+	MODEL antord = dm;
+RUN;
 
+PROC FREQ DATA = four;
+	TABLE antord * dm;
+RUN;
 
-
-*Last, perform a multivariable ordinal logistic model for higher antigen response;
-*Adjust the model for age, sex, and vitamin d status; 
+*Last, perform a multivariable ordinal logistic 
+model for higher antigen response;
+*Adjust the model for age, sex, and vitamin d status;
+ 
 *Model 3.4;
-proc logistic data=four descending;
-class dm (Param=ref ref='0') vitdcat2 (param=ref ref='0');
-model antord=DM RIDAGEYR riagendr vitdcat2; 
-run;
-*Were all the observations used in model 3.4? ?????;
-*Was the proportional odds assumption met? ?????;
+PROC LOGISTIC DATA = four DESCENDING;
+	CLASS dm (REF='0') vitdcat2 (REF='0');
+	MODEL antord = dm ridageyr riagendr vitdcat2;
+RUN;
+
+*Were all the observations used in model 3.4?
+- Yes;
+
+*Was the proportional odds assumption met?
+- not enough evidence to reject the null = proportional;
+
 *What is the interpretation of the DM and preDM ORs?
+- PreDM OR = 1.240
+- DM OR = 1.129;
 
 
 
