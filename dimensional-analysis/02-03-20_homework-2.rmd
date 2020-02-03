@@ -1,0 +1,211 @@
+---
+title: "MSCR 509: Homework 2"
+author: Anish Shah, MD
+date: February 3, 2020
+header-includes:
+- \usepackage{booktabs}
+output: pdf_document
+---
+
+```{r setup, global_options, include=FALSE}
+knitr::opts_chunk$set(
+	cache = TRUE,
+	warning = FALSE,
+	eval = TRUE,
+	echo = TRUE,
+	include = TRUE,
+	message = FALSE,
+	tidy = TRUE,
+	tidy.opts = list(width.cutoff = 60),
+	dpi = 600,
+	dev = "png",
+	options("scipen" = 999, "digits" = 3)
+)
+
+# Libraries
+library(knitr)
+library(tidyverse)
+library(tinytex)
+library(rmarkdown)
+library(haven)
+library(compareGroups)
+library(magrittr)
+library(stargazer)
+```
+
+# Question 1
+
+Describe the appropriate statistical framework for addressing the following scientific questions (statistical hypothesis testing, statistical estimation, development of a statistical model, etc).  Briefly describe the procedure -- this may include: specifying the hypotheses (H0, Ha) and the quantities that you will be calculating, stating how you will make a decision, etc.
+
+## __To assess the effectiveness of a new drug for treating stroke, patients are randomized to the new drug or a standard treatment. Stroke severity (continuous measure) is measured at the end of the study.__
+
+1. The outcome is a linear variable of _stroke severity_
+1. This is a comparison of two groups of patients, randomized to a drug or standard treatment
+1. $H_{0}$: _There is no difference between the mean stroke severity between groups_
+1. $H_{1}$: _The mean stroke severity in the treatment group is different than that of the control group._
+1. $\alpha = 0.05$
+1. To start, we should assess distribution of the outcome, including size, and assess whether it can follow a t-distribution.
+1. If so, then a two-sample t-test would be an appropriate starting test. 
+1. If the mean severity score is less, with an appropriately p-value less than our prescribed $\alpha$, then this new drug is worth further investigation
+1. Can also think about confounding variables about patient population that would interfere with our simple analysis
+
+## __Subjects are recruited to determine the prevalence of chronic fatigue syndrome among the general population.__
+
+1. _Chronic Fatigue Syndrome (CFS)_ is a binary variable, either present or absent. To assess prevalence, an observational study would be needed. The recruitment process would need an effective sampling method
+1. As we are assessing prevalence, there isn't a necessary statistical test or hypothesis to be explored. Howeve, the study design is important. In this case, a cross-sectional study would be appropriate.
+1. I would collect data in such a fashion that groups could be tested (_chi-square_) if need be later on, although this currently just assesses prevalence.
+
+## __To determine the risk factors (early life stress, gender, etc) that are associated with depression, a cross sectional study is conducted.__
+
+1. In this case, _depression_ is the outcome variable. There are two approaches to assess the covariates: a) we can assess them in a predictive model, or b) in a causal model. 
+1. The IV can be both categorical and continuous (e.g. age). The dependent variable could be assessed as a linear/continuous variable of depressive symptoms, or as a categorical variable of the presence/absence of depression. Per the question stem, it seems to be phrased for a categorical/dichotomous dependent variable.
+1. A multivariable logistic regression would be the most appropriate test.
+1. $H_{0}$: _The beta coefficients for each covariate is 0_
+1. $H_{1}$: _The beta coefficients for at least one of the covariates is not 0_
+1. $\alpha = 0.05$
+1. This testing woudl allow us to examine the relationship of each variable in the model. The question becomes how to best build the model, and which variables to add at what time. I would start with variables supported by the literature and use a step-wise model.
+1. I would make my decision with the final model.
+
+## __Asthma cases and matched controls are enrolled to determine whether the asbestos exposure is related to asthma.__
+
+1. This describes a case control study, thus a fixed rate. We can assess the odds ratio in this case, as the exposure variable is binary. We can also assess the probability of distribution / independence of hte populations.
+1. Assuming that no box in this 2x2 matrix has less than 5 observations, we can use a _Chi-square test_.
+1. $H_{0}$: _There is no association between asbestos and asthma_
+1. $H_{1}$: _There is an independent association between asbestos and asthma_
+1. $\alpha = 0.05$
+1. We would have to identify degrees of freedom, and look at how the data falls on a chi-square distribution to assess a p-value. If so, we can reject the null hypothesis.
+
+## __To determine the accuracy of a new procedure for measuring renal volume (continuous measurement), each patients' renal volume is measured by both the new procedure and MRI (the gold standard).__
+
+1. There are two measurements, the new renal volume and the MRI volume. Each patient is thus being tested twice, and each measurement should be "paired" essentially.
+1. $H_{0}$: _There is no difference between renal volumes by new or MRI methods_
+1. $H_{1}$: _There is a difference in renal volumes by the new versus MRI method_
+1. $\alpha = 0.05$
+1. I would assess this by a _paired t-test_, assuming the volume distributions followed a t-distribution. 
+1. If there was no difference between new and MRI methods based on the p-value (e.g. I had insufficient evidence to reject the null), I would be able to use this new renal volume measurement as an alternative.
+
+# Question 2
+
+To assess the effectiveness of a new drug for treating an infectious disease, patients with the disease at the baseline are randomized to a new drug or a placebo treatment. The subjects are tested for disease improvement based on culture result in blood/urine at the end of study (at 8 week).  Negative culture suggests improvement.  The SAS dataset diseaseX can be found on Canvas. 
+
+Variables:
+
+- Outcome (week8_result): 1=Culture Negative, 0=Culture Positive
+- Covariates: treat (test or control), age, gender (1=Male 2=Female), BMI, antibiotic resistance (1=resistant, 0=not resistant). 
+
+```{r setup disease dataset}
+# Data intake
+disease <- read_sas("diseasex.sas7bdat")
+
+# Preview data for assignment
+head(disease)
+```
+
+The goal of the experiment is to assess the treatment effectiveness by culture conversion. 
+_Using descriptive results, describe the baseline characteristics for those who received the treatment vs those who did not. In your Table, you need to describe age and BMI as continuous variables as well as binary variables by creating two new variables such Age_cat: Age < 30/Age >= 30 ; and BMI_cat:  BMI < 18.5 / BMI >= 18.5.  Please provide an informative Table by including mean, SD etc. (See Table 1 style and format from article by Royster et al located on the canvas)._
+
+```{r descriptive results, results='markdown'}
+# Data
+df <- disease
+
+# Create age variables
+df$age_cat <- 0
+df$age_cat[df$age >= 30] <- 1
+
+# Create BMI variable
+df$BMI_cat <- 0
+df$BMI_cat[df$BMI >= 18.5] <- 1
+
+# Identify which variables are factors
+attr(df$age, "label") <- "Age"
+df$age_cat %<>% factor(., levels = c(0,1), labels = c("<30", ">= 30"))
+attr(df$age_cat, "label") <- "Age Category"
+df$BMI_cat %<>% factor(., levels = c(0,1), labels = c("<18.5", ">= 18.5"))
+attr(df$BMI_cat, "label") <- "BMI Category"
+df$Gender %<>% factor(., levels = c(1,2), labels = c("Male", "Female"))
+df$antibiotic %<>% factor(., levels = c(0,1), labels = c("Not Resistant", "Resistant"))
+attr(df$antibiotic, "label") <- "Abx Resistance"
+
+# Table based on those that were treated versus not treated
+compareGroups(treat ~ age + age_cat + Gender + BMI + BMI_cat + antibiotic,
+			  data = df) %>%
+	createTable(., show.p.overall = TRUE) %>%
+	export2md(., size = 8, 
+				 caption = "Characteristics in Test versus Control Groups for Disease")
+```
+
+_Test the hypothesis that the conversion rate is the same between test and placebo group. This should include: specifying the hypotheses (H0, Ha) and statistical method, results in a Table and conclusion._
+
+```{r}
+# Data from above
+df <- df
+
+# THis is likely a chi-square test as the DV is either culture + or -
+# The IV is treatment or not
+# Question becomes if treatment changes rate of cure
+tConversion <- chisq.test(df$week8_result, df$treat)
+
+print(tConversion)
+```
+
+The $H_{0}$ is that there is no difference between treatment groups for culture changing to negative. The $H_{1}$ is that the treatment group will have a different / higher probability of having cure. The appropriate test is a _chi-square test_. We will set the $\alpha = 0.05$ for this test.
+
+In this case, the p-value is `r tConversion$p.value`. This is above the set $\alpha$, and we thus have insufficient evidence to reject $H_{0}$. We can conclude there is no significant difference in the rate of cure/conversion in those that are treated.
+
+_Test the hypothesis that mean BMI is different for treatments (variable treat). This should include: specifying the hypotheses (H0, Ha) and statistical method, results and conclusion._
+
+```{r}
+# Asked to assess if the BMI is different between treatment groups
+
+# Data
+df <- df
+
+# Simple t-test
+tBMI <- t.test(df$BMI ~ df$treat)
+
+# Show output
+print(tBMI)
+```
+
+The $H_{0}$ is that there is no difference in means between treatment groups for BMI. The $H_{1}$ is that the mean BMI between treatment groups is different. The appropriate test is a _two-sample t-test_. We will set the $\alpha = 0.05$ for this test.
+
+In this case, the p-value is `r tBMI$p.value`. This is above the set $\alpha$, and we thus have insufficient evidence to reject $H_{0}$. We can conclude there is no significant difference in BMI between treatment groups.
+
+_Draw a bar graph to display your results for task 2b. (See SAS code for an example of barchart on canvas)._
+
+```{r}
+# Data
+df <- df
+
+# Make pretty the outcome variable
+df$week8_result %<>% factor(., levels = c(0,1), labels = c("Cx Postive", "Cx Negative"))
+attr(df$week8_result, "label") <- "Cx Conversion"
+
+# Barchart
+ggplot(df, aes(x = week8_result, fill = treat)) +
+	geom_bar(position = "dodge") +
+	theme_minimal() +
+	labs(
+		title = "Culture Conversion Rate by Treatment Group",
+		x = "Culture status",
+		y = "Count"
+	)
+```
+
+_Perform a univariate analysis to determine the factors that may be associated with the response variable (negative culture). A possible way of presenting the results is as follows._
+
+
+```{r, results='markdown'}
+# Data
+df <- df
+
+# Make pretty table
+attr(df$treat, "label") <- "Treatment Group"
+
+# Table based on those that were treated versus not treated
+compareGroups(week8_result ~ treat + age_cat + Gender + BMI_cat + antibiotic,data = df) %>%
+	createTable(., show.p.overall = TRUE, show.n = TRUE, show.ratio = TRUE, show.p.mul = TRUE, show.descr = TRUE, show.p.ratio = TRUE) %>%
+	export2md(., size = 8, caption = "Analysis of Culture Conversion by Covariates")
+	
+```
+
