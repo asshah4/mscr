@@ -1,0 +1,308 @@
+---
+title: "MSCR 534: Analysis Exercise 1"
+author: "Anish Shah"
+date: "February 14, 2020"
+output: pdf_document
+latex_engine: xelatex
+header-includes:
+  - \usepackage{dcolumn}
+  - \usepackage{float}
+  - \usepackage{graphicx} 
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+  - \usepackage{caption}
+  - \captionsetup[table]{labelformat=empty}
+---
+
+```{r global_options, include = FALSE}
+# Knitr options
+knitr::opts_chunk$set(
+  cache = TRUE,
+  warning = FALSE,
+  eval = TRUE,
+  echo = FALSE,
+  include = FALSE,
+  message = FALSE,
+  dpi = 600,
+  dev = "png",
+  options("scipen" = 999, "digits" = 3),
+  tinytex.verbose = TRUE,
+  tidy = FALSE
+)
+
+options(xtable.comment = FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(knitr)
+library(rmarkdown)
+library(magrittr)
+library(compareGroups)
+library(haven)
+library(kableExtra)
+```
+
+
+# Assignment Description
+
+- Present epidemiological data in table format for communicating findings
+- Logistic regressions are used for both crude and adjusted associations
+- Demonstrate software skills to create logistic models, interprate model results, and build multivariable models
+
+General models for analysis:
+
+- Model A
+	- Exposure = HIV status
+	- Outcome = site of extra-pulmonary TB (EPTB)
+- Model B
+	- Exposure = country of birth
+	- Outcome = prison diagnosis of TB
+
+# Table 1. Bivariate associations and crude OR for outcome site of EPTB
+
+## Requirements
+
+- _Table 1_ style figure (similar to prior Analysis Exercise 1 from fall semester)
+- Instead of Total column, present crude odds ratios (95% CI) between covariates and site of EPTB
+- Dichotomous outcome variable from XPSITE should be used as well
+- Include 5 participant characteristics in Table 1 (including 1 continuous variable), along with primary exposure of HIV
+- Each characteristic should have crude odds ratios (95% CI), indicate referent category for each
+
+## Data intake and tidying
+
+The SAS dataset _EPTB_ was read in and processed/cleaned, to make the following simple data set with covariates chosen by clinical importance.
+
+```{r, include=TRUE}
+# Data
+eptb <- read_sas("eptb.sas7bdat")
+df1 <- eptb
+
+# Create dichotomous variable for XPSITE
+# Original labels were ... XPSITE 2 = CNS, 5 = Lymph
+# For us, will do dichotomous for CNS = 1, other = 0
+df1$XPSITE_NOM[df1$XPSITE == 2] <- 1
+df1$XPSITE_NOM[df1$XPSITE %in% c(1,3:9)] <- 0 # There is 1 NA value here
+
+# Outcome = xpsite, exposure = HIV
+# Select 5 covariates: GEN, AGE, RACECORR, CD4ADM, ARV, PreviousTB, 
+
+### Clean up data
+
+# Outcome
+df1$XPSITE_NOM %<>% 
+	factor(., levels = c(0, 1), labels = c("Other", "CNS"))
+attr(df1$XPSITE_NOM, "label") <- "EPTB Site"
+
+# Exposure
+df1$HIV %<>% 
+	factor(., levels = c(0, 1), labels = c("Negative", "Positive"))
+attr(df1$HIV, "label") <- "HIV Status"
+
+# Sex
+df1$GEN %<>% factor(., levels = c(0, 1), labels = c("Female", "Male"))
+attr(df1$GEN, "label") <- "Sex"
+
+# Age
+attr(df1$AGE, "label") <- "Age (years)"
+
+# Previous TB 
+df1$PreviousTB %<>% 
+	factor(., levels = c(0,1), labels = c("No",  "Yes"))
+attr(df1$PreviousTB, "label") <- "H/o Active TB"
+
+# CD4ADM
+attr(df1$CD4ADM, "label") <- "CD4 Count"
+
+# ARV
+df1$ARV %<>% 
+	factor(., levels = c(0,1), labels = c("No", "Yes"))
+attr(df1$ARV, "label") <- "Anti-retroviral Use"
+
+### Present this data
+
+# Head
+subset(df1, select = c(ID, XPSITE_NOM, HIV, GEN, AGE, 
+					  CD4ADM, ARV, PreviousTB)) %>%
+	head(.) %>% 
+	kable(., "latex", caption = "Covariates chosen for Table 1", 
+		  booktabs = TRUE) %>%
+	kable_styling(latex_options = c("HOLD_position"))
+```
+
+The previous data was presented in the following "Table 1" style format, with crude odds ratios for each parameter.
+
+```{r, include = TRUE}
+# Data from above, will lose attributes if I subset it
+
+# CompareGroups style table
+compareGroups(
+	XPSITE_NOM ~ HIV + GEN + AGE + ARV + CD4ADM + PreviousTB, 
+	data = df1, include.label = TRUE, simplify = FALSE, 
+	include.miss = TRUE
+	) %>% 
+	createTable(
+		show.n = FALSE, show.p.overall = FALSE, 
+		show.ratio = TRUE
+	) %>%
+	export2md(format = "latex", caption = "Table 1. Characteristics by EPTB Site")
+```
+
+# Table 2. Bivariate associations and crude OR for outcome TB diagnosed in prison
+
+- Similar to Table 1 above, however outcome is prison diagnosis, and exposure is country of birth
+- Create new prison dx variable - assume _missing_ prison dx had actually been diagnosed in prison (use this as outcome variable)
+- Instead of Total column, present crude odds ratios (95% CI) between covariates and prison diagnosis. Columns should consist of those who had prison dx and those who did not.
+- Include 5 participant characteristics in Table 1 (including 1 continuous variable), along with primary exposure of country of birth
+- Each characteristic should have crude odds ratios (95% CI), indicate referent category for each
+
+## Date intake and tidying
+
+The following covariates were chosen, and presented as a sample data set below. 
+
+```{r, include = TRUE}
+# Data to use
+df2 <- eptb
+
+### Create new variable about prison status
+# If NA, then actually dx in prison = 1
+df2$PRISON_DX <- df2$PRISON
+df2$PRISON_DX[is.na(df2$PRISON)] <- 1
+
+### Clean the data
+
+# Outcome
+df2$PRISON_DX %<>% 
+	factor(., levels = c(0,1), labels = c("No", "Yes"))
+attr(df2$PRISON_DX, "label") <- "TB Dx in Prison"
+
+# Exposure
+df2$COUNTRY %<>% 
+	factor(., levels = c(0,1), labels = c("USA", "Foreign"))
+attr(df2$COUNTRY, "label") <- "Birthplace"
+
+### Select / clean covariates: AGE, GEN, PreviousTB, Homeless, DrugUse, AlcoholAbuse, COPU
+
+# Sex
+df2$GEN %<>% factor(., levels = c(0, 1), labels = c("Female", "Male"))
+attr(df2$GEN, "label") <- "Sex"
+
+# Age
+attr(df2$AGE, "label") <- "Age (years)"
+
+# Previous TB
+df2$PreviousTB %<>% 
+	factor(., levels = c(0,1), labels = c("No", "Yes"))
+attr(df2$PreviousTB, "label") <- "H/o Active TB"
+
+# Pulmonary disease
+df2$COPU %<>%
+	factor(., levels = c(0,1), labels = c("No", "Yes"))
+attr(df2$COPU, "label") <- "Concurrent Pulmonary Dz"
+
+# Drug Use
+df2$DrugUse %<>%
+	factor(., levels = c(0,1), labels = c("No", "Yes"))
+attr(df2$DrugUse, "label") <- "Illegal Drug Use"
+
+# Alcohol Abuse
+df2$AlcoholAbuse %<>%
+	factor(., levels = c(0,1), labels = c("No", "Yes"))
+attr(df2$AlcoholAbuse, "label") <- "Alcohol Abuse"
+
+### Present this data
+
+# Head
+subset(df2, select = c(
+	ID, PRISON_DX, COUNTRY, PreviousTB, COPU, DrugUse, AlcoholAbuse
+	)) %>%
+	head(.) %>% 
+	kable(., "latex", caption = "Covariates chosen for Table 2", 
+		  booktabs = TRUE) %>%
+	kable_styling(latex_options = c("HOLD_position"))
+```
+
+A "table 1" style figure was created to show the association between covariates and the outcome of TB diagnosis while in prison.
+
+```{r, include = TRUE}
+# Data from above
+
+# CompareGroups style table
+compareGroups(
+	PRISON_DX ~ 
+		COUNTRY + GEN + AGE + PreviousTB + COPU + DrugUse + AlcoholAbuse,
+	data = df2, include.label = TRUE, simplify = FALSE, 
+	include.miss = TRUE
+) %>%
+	createTable(
+		show.n = FALSE, show.p.overall = FALSE, 
+		show.ratio = TRUE
+	) %>%
+	export2md(format = "latex", caption = "Table 2. Characteristics by Prison Diagnosis of TB")
+```
+
+
+# Table 3. Multivariable model for association between HIV and site of EPTB
+
+- Model A purpose is to estimate unbiased association between HIV and EPTB
+- Create DAG to demonstrate hypothesized causal relationship of variables in Table 1 (including covariates)
+- Based on DAG, build model A with crude and adjusted OR in Table 3. Adjusted model (regardless of important covariates or DAG) should include HIV and previous TB as independent variables
+
+# Table 4. Multivariable model for association between country of birth and TB diagnosis in prison
+
+- Similar to table 3 above. Model B purpose is to estimate unbiased association between country of birth and prison diagnosis
+- Create DAG to demonstrate hypothesized causal relationship of variables in Table 2 (including covariates). Relationship between country of birth and covariates should be thoroughly explored.
+- Based on DAG and observed bivariate associations, build model B and report crude and adjusted OR in Table 4. Adjusted model should at minimum contain country of birth and age as independent variables.
+
+# Questions
+
+## 1. Titles
+
+1. What are the titles for Tables 1-4?
+
+## 2. Table 1
+
+2A. How was the outcome variable of XPSITE dichotomized? Why was the decision made to dichotomize the variable using the categories chosen?
+
+2B. Which covariate had the strongest measure of association with the site of EPTB variable you created? 
+
+2C. Interpret the measure of association reported in part 2B using one sentence.
+
+2D. Which covariate had the lowest p-value in its association with the site of EPTB variable you created? What was the statistical test used and what was the p-value? 
+
+2E. Interpret the p-value reported in part 2D using one sentence.
+
+## 3. Table 2
+
+3A. What was the prevalence ratio for a TB prison diagnosis, comparing those born in the US to those born outside the US? 
+
+3B. What was the odds ratio for prison diagnosis, comparing those born in the US to those born outside the US? 
+
+3C. Does the odds ratio estimate the prevalence ratio? Why or why not? Explain your answer in one sentence.
+
+3D. Did the assumption that those with missing prison information had actually been diagnosed in prison change the estimated measure of association toward the null, away from the null, or had no effect?  
+
+## 4. Table 3
+
+4A. Consider your DAG for Model A. Are there any unblocked backdoor paths from HIV to the EPTB variable? If yes, list the pathway. 
+
+4B. Consider your DAG for Model A. Are there any colliders? If yes, list the colliders.
+
+4C. Based on bivariate analyses, are any covariates strongly associated with the outcome (EPTB site) or with the exposure of interest (HIV)? Are there any significantly associated with both? 
+
+4D. State the expression for the odds ratio of EPTB site comparing someone with HIV to someone without HIV in the adjusted model. 
+
+## 5. Table 4
+
+5A. In a short paragraph (<= 4 sentences) describe the model building strategy used for Model B. 
+
+5B. As if you were writing a sentence for a Results section of a scientific article, report the main findings of Model B. Use only one sentence.
+
+5C. In Model B, did the assumption that those with missing prison information had actually been diagnosed in prison change the adjusted estimated measure of association toward the null, away from the null, or had no effect? How does this compare to part 3D?  
