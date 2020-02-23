@@ -1,0 +1,215 @@
+---
+title: MSCR 509 Homework 3
+author: Anish Shah
+date: February 10, 2020
+output: pdf_document
+---
+
+```{r setup, global_options, include=FALSE}
+knitr::opts_chunk$set(
+	cache = TRUE,
+	warning = FALSE,
+	eval = TRUE,
+	echo = FALSE,
+	include = FALSE,
+	message = FALSE,
+	dpi = 600,
+	dev = "png",
+	options("scipen" = 999, "digits" = 4)
+)
+
+library(knitr)
+library(rmarkdown)
+library(tidyverse)
+library(broom)
+library(haven)
+library(magrittr)
+library(lmtest)
+```
+
+# Question 1
+
+## Description
+
+A logistic regression model was used to determine the association of low birth weight infants (Y) and maternal age (X1) and the smoking status (X2). The birth weight is coded as 1 (low) and 0 (not low).  The variable X1 is continuous and the variable X2 is coded as 1 for smokers and 0 otherwise.
+
+## Answers
+
+__Write down the mathematical form of the logistic regression model. Be sure to define all the variables.__
+
+$$log\left(\frac{P(Y=1)}{1-P(Y=1)}\right) = \beta_{0} + \beta_{1}x_{1} + \beta_{2}x_{2} $$
+
+$p =$ probability of low birth weight  
+$\beta_{0} =$ intercept  
+$\beta_{1} =$ coefficient/weight of hte maternal age feature/parameter  
+$x_{1} =$ maternal age (continuous)  
+$\beta_{2} =$ coefficient/weight of smoking smoking status feature/parameter  
+$x_{2} =$ smoking status (binary)  
+
+__When Pr(Y=1) is modeled using logistic regression, the regression coefficients associated with maternal age and smoking status are 0.042 (SE=0.029, p-value=0.003) and 0.033 (SE=0.012, p-value=0.006). The intercept is 0.027. Interpret the effects of maternal age and smoking on the probability of a low birth weight infant. Be sure to interpret both the direction and size of the effect.__
+
+With the assumption that hte $\alpha = 0.05$, the $beta_{1}$ and $beta_{2}$ coefficients have enough evidence that we can reject the null hypothesis. There is an increased $OR = `r exp(0.042)`$ for LBW infant for every 1 year increase in maternal age. There is an increase $OR = `r exp(0.033)`$ for smokers versus non-smokers. 
+
+__Assuming this model is appropriate, write down the predictive equation for predicting the probability of a low birth infant in the future.__
+
+$$\hat{p} = \frac{e^{0.027 + 0.042x_{1} + 0.033x_{2}}}{1+e^{0.027 + 0.042x_{1} + 0.033x_{2}}}$$
+
+__What is the predicted probability of having a low weight baby for a 35 years old woman who is a smoker?__ 
+
+$P(Y=1) = 0.822$
+
+__What is the predicted probability of not having a low weight baby for a 35 years old woman who is a smoker?__ 
+
+$P(Y=0) = 1 - P(Y=1) = 1 - 0.822 = 0.178$
+
+# Question 2
+
+## Description
+
+The treatment regimen for patients who have been diagnosed as having cancer of the prostate is crucially dependent upon whether or not the cancer has spread to the surrounding lymph nodes.  Indeed, a laparotomy (a surgical incision into the abdominal cavity) may be performed to ascertain the extent of this nodal involvement.  However, there are a number of variables that are indicative of nodal involvement that can be measured noninvasively, and the aim of a study reported by Brown (1980) was to determine whether a combination of variables could be used to forecast whether or not the cancer has spread to the lymph nodes. The response variable (Y) is the presence or absence of nodal involvement (Y: 1 = present, 0 = absent).  The  prognostic variables considered are: 
+
+- AGE - age of patient at diagnosis (in years)
+- ACID - level of serum acid phosphatase (in King-Armstrong units)
+- XRAY - the result of an X-ray examination (0 = negative, 1 = positive)
+- SIZE - the size of the tumor as determined by a rectal examination (0 = small, 1 = large)
+- GRADE - a summary of the pathological grade of the tumor determined from a biopsy (0 = less serious, 1 = more serious)
+- SES - income (high, middle, low)
+
+## Responses
+
+__What is the proportion of subjects with presence of nodal involvement?__
+
+```{r}
+# Data
+prostate <- read_sas("prostate_data2.sas7bdat")
+df <- prostate
+
+# Nodal involvement 
+a <- table(df$y)[2]
+b <- nrow(df)
+```
+
+Of the `r b` patients, there are `r a` patients with nodal involvement. This leads to a proportion of `r a/b`.
+
+__Write down the three estimated logistic regression equations for modeling the presence of nodal involvement (Y) in terms of independent variables: AGE (model 1), SES (model 2) and {AGE, SES} (model 3). [Use low income as reference for SES]__
+
+These are the theoretical models for the regression.
+
+$$
+\begin{aligned}
+(1): log\left(\frac{P(Y=1)}{1-P(Y=1)}\right) &= \beta_{0} + \beta_{1}AGE \\
+(2): log\left(\frac{P(Y=1)}{1-P(Y=1)}\right) &= \beta_{0} + \beta_{2}SES_{middle} + \beta_{3}SES_{high} \\
+(3): log\left(\frac{P(Y=1)}{1-P(Y=1)}\right) &= \beta_{0} + \beta_{1}AGE + \beta_{2}SES_{middle} + \beta_{3}SES_{high} \\
+\end{aligned}
+$$
+
+Hypotheses: $H_{0}: \beta_{i} = 0$ and $H_{1}: \beta_{i} \neq 0$, with an $\alpha = 0.05$. After estimating them, we can generate $\beta$ for the models. For SES, the _low_ level is considered the reference level.
+
+```{r}
+# Data 
+df <- prostate
+
+# Clean up
+df$y %<>% factor()
+df$ses %<>% factor(., levels = c("low", "middle", "high")) # makes low the reference
+
+# Model 1
+m1 <- glm(y ~ age, family = binomial, data = df)
+
+# Model 2
+m2 <- glm(y ~ ses, family = binomial, data = df)
+
+# Model 3
+m3 <- glm(y ~ age + ses, family = binomial, data = df)
+```
+
+$$
+\begin{aligned}
+(1): log\left(\frac{P(Y=1)}{1-P(Y=1)}\right) &= `r m1$coefficients[1]` + `r m1$coefficients[2]`AGE \\
+(2): log\left(\frac{P(Y=1)}{1-P(Y=1)}\right) &= `r m2$coefficients[1]` + `r m2$coefficients[2]`SES_{middle} + `r m2$coefficients[3]`SES_{high} \\
+(3): log\left(\frac{P(Y=1)}{1-P(Y=1)}\right) &= `r m3$coefficients[1]` + `r m3$coefficients[2]`AGE + `r m3$coefficients[3]`SES_{middle} + `r m3$coefficients[4]`SES_{high} \\
+\end{aligned}
+$$
+
+__What is the -2 log L  for each of these three models? Please specify the number of parameters associated with each model. SAS output provides a likelihood ratio test for each of these models - write down the null hypothesis corresponding to this likelihood ratio test.__
+
+```{r, include = FALSE}
+# Compare models
+ma <- anova(m1, m2, m3, test = "Chisq")
+l1 <- -2*logLik(m1)
+l2 <- -2*logLik(m2)
+l3 <- -2*logLik(m3)
+```
+$$
+\begin{aligned}
+(1): -2 log L &= `r l1` \; (df=2), H_{0}: \beta_{1} = 0, H_{1}: \beta_{1} \neq 0 \\
+(2): -2 log L &= `r l2` \; (df=3), H_{0}: \beta_{2},\beta_{3} = 0, H_{1}: \beta_{2},\beta_{3} \neq 0 \\
+(3): -2 log L &= `r l3` \; (df=4), H_{0}: \beta_{1},\beta_{2},\beta_{3} = 0, H_{1}: \beta_{1},\beta_{2},\beta_{3} \neq 0 \\
+\end{aligned}
+$$
+
+__We plan to compare model 3 vs. model 2. In other words, we would like to test the hypothesis that the coefficient corresponding to AGE is zero. Construct a likelihood ratio test by hand to test this hypothesis - include all steps, and be sure to specify your significance level.  What is your conclusion? Provide Wald test statistic and p value for age in the presence of SES.__
+
+$$
+\begin{aligned}
+(3): log\left(\frac{P(Y=1)}{1-P(Y=1)}\right) &= \beta_{0} + \beta_{1}AGE + \beta_{2}SES_{middle} + \beta_{3}SES_{high} \\
+(2): log\left(\frac{P(Y=1)}{1-P(Y=1)}\right) &= \beta_{0} + \beta_{2}SES_{middle} + \beta_{3}SES_{high} \\
+\end{aligned}
+$$
+
+$H_{0}: \beta_{1} = 0$  
+$H_{1}: \beta_{1} \neq 0$  
+$\alpha = 0.05$  
+
+In the nested models above (model 2 and model 3), we can assess hypothesis if age is a significant parameter in predicting lymph node spread.
+
+1. Model 3 has a $-2logL = `r l3`$, and model 2 hasa $-2logL = `r l2`. 
+1. The difference in log likelihood is __`r l2-l3`__. With 1 degree of freedom, and an $\alpha = 0.05$, the corresponding $\chi^{2} = qchisq(0.95, df=1)$. 
+1. The likelihood ratio test results, compared to our specificied $\chi^{2}$ cut-off, is $`r l2-l3` < `r qchisq(0.95, df=1)`$. 
+1. Based on the Wald test statistic, we have a value of `r waldtest(m3, m2, test = "Chisq")[2,3]`, df=1, and $p=`r waldtest(m3, m2, test = "Chisq")[2,4]`$, which is also less then our $\chi^{2}$ value.
+1. We do not have sufficient evidence to reject $H_{0}$, and we can thus conclude that age is not needed in this model.
+
+__We would like to compare model 1 and model 2.  Can we perform a likelihood ratio test?  Please be specific in your explanation.  What else can be used to compare these two models?  Compare the models and state your conclusion.__
+
+$$
+\begin{aligned}
+(2): log\left(\frac{P(Y=1)}{1-P(Y=1)}\right) &= \beta_{0} + \beta_{2}SES_{middle} + \beta_{3}SES_{high} \\
+(1): log\left(\frac{P(Y=1)}{1-P(Y=1)}\right) &= \beta_{0} + \beta_{1}AGE \\
+\end{aligned}
+$$
+
+The features/parameters in the above models are not nested. Thus, we cannot use the likelihood ratio tests. If the null hypothesis were true, these models would not be the same. Non-nested testing is needed. We can instead compare the models using the _Akaike information criteria_ (AIC). 
+
+For model 2, the $AIC = `r AIC(m2)`$. For model 1, the $AIC = `r AIC(m1)`$. As model 2 has a lower AIC, this is suggestive that model 2 is a better model, however this is not a statistical test. It just suggests that the fit for model 2 is better than model 1. 
+
+__Use SAS to create a boxplot for predicted P vs observed from model 3. Attach your boxplot with homework.__
+
+```{r, include=TRUE}
+pred <- predict(m3, df, type = "response")
+df$pred <- pred
+df$nodal <- factor(df$y)
+
+# Plot data... somehow into a boxplot
+ggplot(data = df, aes(y = pred, x = nodal, fill = nodal)) +
+	geom_boxplot(position = "dodge") +
+	theme_minimal() + 
+	labs(
+		title = "Predicted nodal involvement based on age and SES",
+		y = "Predicted values",
+		x = "Actual nodal involvement"
+	) + 
+	scale_fill_viridis_d(option = "E") +
+	theme(legend.position = "none") + 
+	scale_y_continuous(breaks = seq(0, 1, 0.1))
+
+```
+
+__Use SAS and model 3 to report predicted p for two patients: 55 year old with high income and 55 year old with middle income.__
+
+$$(3): log\left(\frac{P(Y=1)}{1-P(Y=1)}\right) = \beta_{0} + \beta_{1}AGE + \beta_{2}SES_{middle} + \beta_{3}SES_{high} \\$$
+
+With the appropriate $\beta$ values...
+
+$$(3): log\left(\frac{P(Y=1)}{1-P(Y=1)}\right) = 2.2527 + -0.0412AGE + 0.5612SES_{middle} + -1.4079SES_{high} \\$$
+
+For a patient that is 55 years old and has a high-income class, the predicted value is __$p = -1.421$__. For a patient that is 55 years old and has a middle-income class, the predicted value is __$p = 0.5479$__.

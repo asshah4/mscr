@@ -1,6 +1,8 @@
 base
 RevoUtilsMath
 RevoUtils
+knitr
+rmarkdown
 tidyverse
 ggplot2
 tibble
@@ -10,9 +12,11 @@ purrr
 dplyr
 stringr
 forcats
-knitr
-rmarkdown
+broom
+haven
 magrittr
+zoo
+lmtest
 lattice
 survival
 Formula
@@ -23,7 +27,10 @@ haplo.stats
 mvtnorm
 SNPassoc
 compareGroups
-haven
-kableExtra
-DiagrammeR
+pROC
 stargazer
+tinytex
+caret
+e1071
+kableExtra
+ResourceSelection

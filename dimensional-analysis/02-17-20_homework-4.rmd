@@ -1,0 +1,147 @@
+---
+title: "MSCR 509: High Dimensional Analysis"
+subtitle: "Homework 4"
+author: Anish Shah
+date: February 10, 2020
+output: pdf_document
+---
+
+```{r setup, global_options, include=FALSE}
+knitr::opts_chunk$set(
+	cache = TRUE,
+	warning = FALSE,
+	eval = TRUE,
+	echo = FALSE,
+	include = FALSE,
+	message = FALSE,
+	dpi = 600,
+	dev = "png",
+	options("scipen" = 999, "digits" = 4)
+)
+
+library(knitr)
+library(rmarkdown)
+library(tidyverse)
+library(broom)
+library(haven)
+library(magrittr)
+library(lmtest)
+library(compareGroups)
+```
+
+# Description
+
+Data were collected as part of a larger study at Baystate Medical Center in Springfield, MA. This data set contains information on 189 births to women seen in the obstetrics clinic. Fifty-nine of these births were low birth weight. The goal of the current study was to determine whether the variables included in the data set were risk factors for having low birth weight in the clinic population being served by the Baystate Medical Center.  Actual observed variable values have been modified to protect subject confidentiality.
+
+Variables are below. Description, and then SAS variable (short name):
+
+Low Birth Weight (‘no’ = Birth Weight ≥ 2500g, ‘yes’ = Birth Weight < 2500g)
+*LOW_BIRTH_WEIGHT  (LOW)
+
+Age of the Mother in Years                              		AGE
+
+Weight in Pounds at the Last Menstrual Period           	WEIGHT (LWT)
+
+Race (‘white’, ‘black’, ‘other’)                  			*RACE
+
+Smoking Status During Pregnancy (‘yes’, ‘no’)       		*SMOKE
+
+History of Premature Labor (‘yes’, ‘no’)          		*PREMATURE_LABOR (PTD)
+
+History of Hypertension (‘yes’, ‘no’)          		*HYPERTENSION (HT)
+
+Presence of Uterine Irritability (‘yes’, ‘no’)          		*UTERINE_IRRITABILITY (UI)
+
+* These variables are coded in SAS as ‘character variables,’ and therefore require use of the CLASS statement to model properly.  Be sure to specify ‘reference cell coding’ and the chosen reference group.  For example,    CLASS RACE (param=ref ref='white').
+
+```{r}
+# Read in data set on birth weights
+birthweights <- read_sas("birthweights.sas7bdat")
+
+# Clean data
+df <- birthweights
+df$low_birth_weight %<>% factor()
+df$race %<>% factor(levels = c("white", "other", "black"))
+df$smoke %<>% factor()
+df$premature_labor %<>% factor()
+df$hypertension %<>% factor()
+df$uterine_irritability %<>% factor()
+
+# Save
+birthweights <- df
+
+```
+
+
+# Question 1
+
+Perform univariate logistic regression and report beta coefficients (and SE), unadjusted odds ratios (95% confidence intervals and p-value) in Table 1. Round Odds Ratio and beta coefficients to 3 significant digits. Crate Table 1 (or fill it in on word document).
+
+```{r}
+# Data
+df <- birthweights
+
+# Create a table for logistic regression (univariate)
+compareGroups(
+	low_birth_weight ~ age + weight + race + smoke + premature_labor + hypertension + uterine_irritability,
+	data = df,
+	simplify = FALSE,
+	include.miss = TRUE,
+	byrow = TRUE
+) %>%
+	createTable(
+		show.all = TRUE,
+		show.ratio = TRUE,
+		show.p.overall = FALSE
+	) %>%
+	export2md()
+
+# Regression models
+mAge <- 
+	glm(low_birth_weight ~ age, family = binomial, data = df) %>%
+	tidy(exponentiate = TRUE, conf.int = TRUE)
+
+mWeight <- 
+	glm(low_birth_weight ~ weight, family = binomial, data = df) %>%
+	tidy(exponentiate = TRUE, conf.int = TRUE)
+
+mRace <- 
+	glm(low_birth_weight ~ race, family = binomial, data = df) %>%
+	tidy(exponentiate = TRUE, conf.int = TRUE)
+
+mSmoke <- 
+	glm(low_birth_weight ~ smoke, family = binomial, data = df) %>%
+	tidy(exponentiate = TRUE, conf.int = TRUE)
+
+mPre <- 
+	glm(low_birth_weight ~ premature_labor, family = binomial, data = df) %>%
+	tidy(exponentiate = TRUE, conf.int = TRUE)
+
+mHtn <- 
+	glm(low_birth_weight ~ hypertension, family = binomial, data = df) %>%
+	tidy(exponentiate = TRUE, conf.int = TRUE)
+
+mUter <- 
+	glm(low_birth_weight ~ uterine_irritability, family = binomial, data = df) %>%
+	tidy(exponentiate = TRUE, conf.int = TRUE)
+
+```
+
+
+# Question 2
+
+Perform the recommended procedure discussed in lecture and present your multivariate model in a table similar to univariable table given above.  Report covariates, regression coefficient (SE), odds ratio (95% CI) and p value in a Multivariate Model Table also interpret the odds ratio.
+
+```{r}
+# Data
+df <- birthweights
+
+# Model
+m <- glm(low_birth_weight ~ age + weight + race + smoke + premature_labor + hypertension + uterine_irritability, family = binomial, data = df)
+
+# Selection models
+n <- step(m, direction = "both")
+nTidy <- tidy(n, exponentiate = TRUE, conf.int = TRUE)
+
+```
+

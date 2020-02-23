@@ -1,0 +1,271 @@
+---
+title: "MSCR 509: High Dimensional Analysis"
+subtitle: "Homework 5"
+author: Anish Shah
+date: February 24, 2020
+output: pdf_document
+latex_engine: xelatex
+header-includes:
+  - \usepackage{dcolumn}
+  - \usepackage{float}
+  - \usepackage{graphicx} 
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+
+---
+
+```{r setup, global_options, include=FALSE}
+knitr::opts_chunk$set(
+	cache = TRUE,
+	warning = FALSE,
+	eval = TRUE,
+	echo = FALSE,
+	include = FALSE,
+	message = FALSE,
+	dpi = 600,
+	dev = "png",
+	options("scipen" = 999, "digits" = 4)
+)
+
+library(knitr)
+library(tinytex)
+library(rmarkdown)
+library(tidyverse)
+library(broom)
+library(haven)
+library(magrittr)
+library(lmtest)
+library(compareGroups)
+library(pROC)
+library(stargazer)
+library(caret)
+library(e1071)
+library(kableExtra)
+library(ResourceSelection)
+```
+
+# Description
+
+Data were collected as part of a larger study at Baystate Medical Center in Springfield, MA. This data set contains information on 189 births to women seen in the obstetrics clinic. Fifty-nine of these births were low birth weight. The goal of the current study was to determine whether the variables included in the data set were risk factors for having low birth weight in the clinic population being served by the Baystate Medical Center.  Actual observed variable values have been modified to protect subject confidentiality.
+
+Variables are below. Description, and then SAS variable (short name):
+
+- Low Birth Weight (‘no’ = Birth Weight >= 2500g, ‘yes’ = Birth Weight < 2500g) ... *LOW_BIRTH_WEIGHT  (LOW)
+- Age of the Mother in Years ... AGE
+- Weight in Pounds at the Last Menstrual Period ... WEIGHT (LWT)
+- Race (‘white’, ‘black’, ‘other’) ... *RACE
+- Smoking Status During Pregnancy (‘yes’, ‘no’) ... *SMOKE
+- History of Premature Labor (‘yes’, ‘no’) ... *PREMATURE_LABOR (PTD)
+- History of Hypertension (‘yes’, ‘no’) ... *HYPERTENSION (HT)
+- Presence of Uterine Irritability (‘yes’, ‘no’) ... *UTERINE_IRRITABILITY (UI)
+
+* These variables are coded in SAS as ‘character variables,’ and therefore require use of the CLASS statement to model properly. Be sure to specify ‘reference cell coding’ and the chosen reference group. For example, CLASS RACE (param=ref ref='white').
+
+```{r}
+# Read in data set on birth weights
+birthweights <- read_sas("birthweights.sas7bdat")
+
+# Clean data
+df <- birthweights
+df$low_birth_weight %<>% factor(levels = c("no", "yes"), labels = c(0,1))
+df$race %<>% factor(levels = c("white", "other", "black"))
+df$smoke %<>% factor()
+df$premature_labor %<>% factor()
+df$hypertension %<>% factor()
+df$uterine_irritability %<>% factor()
+
+# Save
+birthweights <- df
+```
+
+# Question 1
+
+__Run a model with [age, race, Hx Hypertension] and report AUC.__
+
+```{r, include=TRUE, results='asis'}
+# Data
+df <- birthweights
+
+# logistic regression
+m1 <- glm(low_birth_weight ~ age + race + hypertension, data = df, family = binomial)
+
+# Make predictions
+df$pred <- predict(m1, df, type = "response")
+
+# ROC curve
+roc1 <- roc(df$low_birth_weight, df$pred)
+
+# Present data
+stargazer(m1, header = FALSE, type = "latex",
+		  no.space = FALSE,
+		  title = "Logistic regression of LBW",
+          model.numbers = FALSE,
+          single.row = FALSE, 
+          apply.coef = exp,
+          ci = TRUE, p.auto = FALSE, report = "vc*s",
+          ci.custom = list(exp(confint(m1))),
+		  table.placement = "H"
+)
+```
+
+The AUROC of _Model 1_ is `r auc(roc1)`.
+
+# Question 2
+
+__Run a model with [age, race, Hx Hypertension, smoking during pregnancy, premature labor] and report AUC. Compare the AUC to the model derived in Question 1 and comment. Also report sensitivity, specificity, false positive rate and false negative rate for prob level = 0.500 for the better model.__
+
+```{r, include=TRUE, results='asis'}
+# New data
+df <- birthweights
+
+# Model
+m2 <- glm(low_birth_weight ~ age + race + hypertension + smoke + premature_labor, data = df, family = binomial)
+
+# Make predictions
+df$pred <- predict(m2, df, type = "response")
+
+# ROC curve
+roc2 <- roc(df$low_birth_weight, df$pred)
+
+# Present data
+stargazer(m2, header = FALSE, type = "latex",
+		  no.space = FALSE,
+		  title = "Logistic regression of LBW with Further Covariates",
+          model.numbers = FALSE,
+          single.row = FALSE, 
+          apply.coef = exp,
+          ci = TRUE, p.auto = FALSE, report = "vc*s",
+          ci.custom = list(exp(confint(m2))),
+		  table.placement = "H"
+)
+```
+
+The AUC of _Model 2_ is `r auc(roc2)`. The AUC of _Model 1_ is `r auc(roc1)`, suggesting that _Model 2_ is more effective or a better predictor. When we set the probability level to be 0.5, we can determine other statistics, as seen below, for this better model. 
+
+```{r, include=TRUE}
+# Confusion matrix with caret
+confusionMatrix(data = factor(as.numeric(df$pred > 0.5)), reference = df$low_birth_weight)$byClass %>%
+	kable(., "latex", booktabs = TRUE) %>%
+	kable_styling(position = "center")
+```
+
+# Question 3
+
+__Write down estimated final multivariate model you obtained in homework 4. What is predictability of this model? Plot ROC curve and find a cut-point with reasonable sensitivity and specificity and report results and justify your answer.__
+
+```{r}
+# Data
+df <- birthweights
+
+# Model
+m <- glm(low_birth_weight ~ age + weight + race + smoke + premature_labor + hypertension + uterine_irritability, family = binomial, data = df)
+
+# Selection models
+m3 <- step(m, direction = "both")
+nTidy <- tidy(m3, exponentiate = TRUE, conf.int = TRUE)
+```
+
+```{r, include=TRUE, results='asis'}
+# Present data
+stargazer(m3, header = FALSE, type = "latex",
+		  no.space = FALSE,
+		  title = "Homework 4 Stepwise Regression Model",
+          model.numbers = FALSE,
+          single.row = FALSE, 
+          apply.coef = exp,
+          ci = TRUE, p.auto = FALSE, report = "vc*s",
+          ci.custom = list(exp(confint(m3))),
+		  table.placement = "H"
+)
+```
+
+The final model from Homework 4 is...
+
+$$
+log\left(\frac{P(LBW)}{1-P(LBW)}\right) = \beta_{0} + \beta_{1}weight + \beta_{2}race + \beta_{3}smoke + \beta_{4}premature_labor + \beta_{5}hypertension
+$$
+
+We can look at the coefficients in the following table, for _Model 3_. We can also examine a ROC curve of this model.
+
+```{r, include=TRUE}
+# Create ROC plot
+# Make predictions
+df$pred <- predict(m3, df, type = "response")
+
+# ROC curve
+roc3 <- roc(df$low_birth_weight, df$pred, auc = TRUE, ci = TRUE)
+
+# Plot
+ggroc(roc3, colour = "black", linetype = 1, size = 1.0) +
+	theme_minimal() +
+	labs(
+		title = "Homework 4 Model (Model 3)"
+	) +
+	geom_abline(intercept = 1, colour = "grey", linetype = 2, size = 1)
+```
+
+The overall curve has an $AUC = `r auc(roc3)`$. In choosing a cutpoint, we should consider first two concepts: 1) clinical utility of predicting LBW babies, and 2) effectiveness of the model. 
+
+1. Clinically, a LBW baby is a high-risk baby, and knowing if this will be the case is important. We would rather overdiagnosis the potential of a LBW then be incorrect. We want a high sensitivity, and can tolerate a low specificity. 
+
+2. Statistically, which we will not do here, we could use the maximum distance from the diagonal line as our choice for cutpoint selection. We could use bootstrapping methods to optimize this cutpoint, but it may not be as clinically relevant.
+
+We will change our cutpoint such that a probabiliy greater than $2/3$ is considered a positive prediction, and less is a negative prediction. With that level of cutoff, we have the following attributes of our algorithm's predictivity.
+
+```{r, include=TRUE}
+# Confusion matrix with caret
+confusionMatrix(data = factor(as.numeric(df$pred > 2/3)), reference = df$low_birth_weight)$byClass %>%
+	kable(., "latex", booktabs = TRUE) %>%
+	kable_styling(position = "center")
+```
+
+# Question 4
+
+__Using better model, do a box plot for observed disease status and estimated predicted probability for disease.__
+
+The best model that we have generated so far is _Model 3_, developed from stepwise regression from _Homework 4_. 
+
+```{r, include=TRUE}
+# Data from above is appropriate for predictive levels.
+# Plot it
+ggplot(data = df, aes(y = pred, x = low_birth_weight, fill = low_birth_weight)) +
+	geom_boxplot() +
+	geom_jitter(alpha = 0.5, aes(color = low_birth_weight)) +
+	theme_minimal() +
+	scale_fill_viridis_d(option = "E") +
+	scale_color_viridis_d(option = "E") +
+	labs(
+		title = "Observed Disease Status and Estimated Predicted Probability of Disease",
+		x = "Low Birth Weight Status",
+		y = "Predicted Probability"
+	)
+```
+
+
+# Question 5
+
+Report Hosmer-Lemeshow test and likelihood ratio test for better model.
+
+```{r}
+h <- hoslem.test(m3$y, fitted(m3), g = 10)
+hstat <- h$statistic
+hp <- h$p.value
+```
+
+For the Hosmer-Lemeshow test for _Model 3_, seen in _Question 3_, the $\chi^{2} = `r hstat`$, with the associated $p = `r hp`$. This suggests that there is not enough evidence to reject the null, so we can accept that this model is a good fit. 
+
+```{r}
+# Models from above
+l <- lrtest(m1, m3)
+lchi <- l$Chisq[2]
+lp <- l$`Pr(>Chisq)`[2]
+```
+
+We will compare this _Model 3_ with _Model 1_, using the Likelihood Ratio Test. The $\chi^{2} = `r lchi`$, which has an associated $p = `r lp`$. This suggests that _Model 3_ is a better fit than _Model 1_ as well.
