@@ -1,0 +1,588 @@
+---
+title: "MSCR 534: Problem Set 1"
+author: "Anish Shah"
+date: "February 28, 2020"
+output: pdf_document
+latex_engine: xelatex
+always_allow_html: yes
+header-includes:
+  - \usepackage{dcolumn}
+  - \usepackage{float}
+  - \usepackage{graphicx} 
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+  - \usepackage{caption}
+  - \usepackage{mathtools}
+  - \usepackage{amsmath}
+  - \captionsetup[table]{labelformat=empty}
+---
+
+```{r setup, include = FALSE}
+# Knitr options
+knitr::opts_chunk$set(
+  cache = TRUE,
+  warning = FALSE,
+  eval = TRUE,
+  echo = FALSE,
+  include = FALSE,
+  message = FALSE,
+  dpi = 600,
+  dev = "png",
+  options("scipen" = 999, "digits" = 5),
+  tinytex.verbose = TRUE,
+  fig.align = "center"
+)
+
+options(xtable.comment = FALSE)
+library(tidyverse)
+library(knitr)
+library(rmarkdown)
+library(tinytex)
+library(magrittr)
+library(kableExtra)
+library(haven)
+library(broom)
+library(stargazer)
+library(lme4)
+library(compareGroups)
+library(DiagrammeR)
+library(survival)
+library(survminer)
+library(ggfortify)
+library(viridis)
+library(rms)
+library(lmtest)
+```
+
+# Question 1 - Frequency Distribution Data
+
+Use the frequency distribution data in Table 1 to answer questions 1A through 1D.  
+
+__Table 1__:
+
+| Outcome | Exposure=1 | Exposure=0 |
+| --- | --- | --- |
+| Level=0 | 69 | 75 |
+| Level=1 | 72 | 66 |
+| Level=2 | 77 | 52 |
+
+__1A. State the expressions for a nominal logistic model to estimate the crude association between the exposure and the outcome variable. Choose level 0 as the reference group for the outcome.__
+
+$$
+\begin{aligned}
+logit(Outcome=2) &= \beta_{0} + \beta_{1}Exposure \\
+logit(Outcome=1) &= \beta_{0} + \beta_{1}Exposure \\
+\end{aligned}
+$$
+
+- Reference for dependent variable is _Outcome=0_
+- Nominal levels of _Outcome_ include: 0, 1, 2
+
+__1B. State the expression for an ordinal logistic model to estimate the crude association between the exposure and outcome variable.__
+
+$$
+ln\left(\frac{P(O \geq g | E)}{P(O < g | E)}\right) = \beta_{g} + \beta_{1}Exposure \\
+$$
+
+...where g = (1, 2)
+
+__1C. Calculate the crude odds ratios (for the effect of the exposure on the outcome) that would result from part 1a.__ 
+
+$$
+\begin{aligned}
+OR_{O=2|E} &= `r (77/69)/(52/65)` \\
+OR_{O=1|E} &= `r (72/69)/(66/65)` \\
+\end{aligned}
+$$
+
+__1D. Calculate three crude odds ratios for an ordinal logistic model: two odds ratios to evaluate the proportional odds assumptions and a third odds ratio that would result from an ordinal logistic model that assumed the odds were proportional.__ 
+
+$$
+\begin{aligned}
+(1): OR_{\frac{O \geq 2 | E}{O < 2 | E}} &= `r (77/(72+69))/(52/(66+65))` \\
+(2): OR_{\frac{O \geq 1 | E}{O < 1 | E}} &= `r ((77+72)/69)/((52+66)/65)` \\
+(3): OR_{proportional} &= `r ((77/(72+69))/(52/(66+65)) + ((77+72)/69)/((52+66)/65))/2` \\
+\end{aligned}
+$$
+
+\newpage
+
+# Question 2 - Interpreting Interaction
+
+Consider a binary logistic model with 4 treatment levels and 3 levels of ethnicity, with indicator dummy variables coded as follows:
+
+| Treatment | T1 | T2 | T3 |
+| --- | --- | --- | --- |
+| 1 | 1 | 0 | 0 |
+| 2 | 0 | 1 | 0 |
+| 3 | 0 | 0 | 1 |
+| 4 | 0 | 0 | 0 |
+
+| Ethnicity | E1 | E2 | 
+| --- | --- | --- |
+| 1 | 1 | 0 |
+| 2 | 0 | 1 |
+| 3 | 0 | 0 |
+
+$$
+\begin{aligned}
+(1): logit(D=1) &= \beta_{0} + \beta_{1}T1 + \beta_{2}T2 + \beta_{3}T3 + \beta_{4}E1 + \beta_{5}E2 \\
+(2): logit(D=1) &= \beta_{0} + \beta_{1}T1 + \beta_{2}T2 + \beta_{3}T3 + \beta_{4}E1 + \beta_{5}E2 \\
+&+ \beta_{6}T1\times E1 + \beta_{7}T1\times E2 + \beta_{8}T2\times E1 + \beta_{9}T2\times E2 \\
+&+ \beta_{10}T3\times E1 + \beta_{11}T3\times E2 \\
+\end{aligned}
+$$
+
+__2A. What is the interpretation of exp($\beta_{1}$) using Model 1?__
+
+The $e^{\beta_{1}} = OR$ for the effect of Treatment 1 (reference group: Treatment 4) on the Outcome with adjustment for ethnicity.
+
+__2B. What is the interpretation of exp($\beta_{1}$) using Model 2?__
+
+The $e^{\beta_{1}} = OR$ for the effect of Treatment 1 (reference group: Treatment 4) on the Outcome with adjustment for not only ethnicity, but the interaction between the treatment levels and ethnicitiy levels. The value of $\beta_{6}$ and $\beta_{7}$ should also be considered for their interaction with Treatment 1 with both Ethnicity 1 and Ethnicity 2.  
+
+__2C. What is the odds ratio comparing Treatment=3 vs Treatment=4 among those with Ethnicity=1 using Model 1?__
+
+- T1 = 0
+- T2 = 0
+- T3 = 1
+- E1 = 1
+- E2 = 0
+
+$$
+\begin{aligned}
+OR &= \frac{e^{\beta_{0} + \beta_{1}T1 + \beta_{2}T2 + \beta_{3}T3 + \beta_{4}E1 + \beta_{5}E2}}{e^{\beta_{0} + \beta_{1}T1 + \beta_{2}T2 + \beta_{3}T3 + \beta_{4}E1 + \beta_{5}E2}} \\
+&= \frac{e^{\beta_{3}(T3=1) + \beta_{4}(E1=1)}}{e^{\beta_{4}(E1=1)}} \\
+&= e^{\beta_{3}(T3=1)} \\
+&= e^{\beta_{3}} \\
+\end{aligned}
+$$
+
+__2D. What is the odds ratio comparing Treatment=3 vs Treatment=4 among those with Ethnicity=1 using Model 2?__
+
+- T1 = 0
+- T2 = 0
+- T3 = 1
+- E1 = 1
+- E2 = 0
+
+$$
+\begin{aligned}
+OR &= \frac{e^{\beta_{3}(T3=1) + \beta_{4}(E1=1) + \beta_{6}T1\times (E1=1) + \beta_{8}T2\times (E1=1) + \beta_{10}(T3=1)\times (E1=1) + \beta_{11}(T3=1)\times E2}}{e^{\beta_{4}(E1=1) + \beta_{6}T1\times (E1=1) + \beta_{8}T2\times (E1=1)}} \\
+&= \frac{e^{\beta_{3}(T3=1) + \beta_{4}(E1=1) + \beta_{10}(T3=1)\times (E1=1)}}{e^{\beta_{4}(E1=1))}} \\
+&= e^{\beta_{3}(T3=1) + \beta_{10}(T3=1)\times (E1=1)} \\
+&= e^{\beta_{3} + \beta_{10}} \\
+\end{aligned}
+$$
+
+\newpage
+
+# Question 3 - Nilton Data
+
+Use the permanent SAS dataset named “Nilton” on Canvas (in Problem Set 1 assignment) to answer questions 3A through 3E. The data came from a cross-sectional study of inpatients with Methicillin-resistant staph aureus (MRSA). For simplicity, ignoring missing values in all answers below.
+
+The dataset contains the following variables: METHICSE (dichotomous outcome of interest, coded 1 for MRSA), AGE (continuous), AGECAT (dichotomous coded 1 if age >= 55), PREVHOSP (dichotomous coded 1 if hospitalized in the previous 6 months), SEX (dichotomous coded 1 for male), PREANTBU (dichotomous coded 1 for antibiotic use in the previous 3 months).  The dichotomous variables are all coded 1 or 0. 
+
+```{r, include=FALSE}
+# Read in data
+nilton <- read_sas("nilton.sas7bdat")
+```
+
+__3A. Suppose you model AGE and SEX as a predictor of METHISCE in a logistic regression. State the model in terms of the prevalence of MRSA.__
+
+$$
+ln(P=MRSA) = \beta_{0} + \beta_{1}AGE + \beta_{2}SEX \\
+$$
+
+__3B. Run the model from 3A to estimate the predicted prevalence of MRSA for a 50 year-old male.__ 
+
+```{r, include = FALSE}
+# Model
+mb <- glm(METHICSE ~ AGE + SEX, family = binomial, data = nilton)
+
+# Data of 50M
+newdata <- data.frame(SEX = 1, AGE = 50)
+
+# Predict prevalence
+predict(mb, newdata)
+
+### Equation approach in latex below
+```
+
+$$P_{MRSA} = `r exp(predict(mb, newdata))`$$
+
+__3C. Run a binary logistic model to estimate the association between previous hospitalization with prevalent MRSA. In an adjusted model, control of AGECAT, SEX, and PREANTBU. What are the crude and adjusted odds ratios? Interpret the adjusted odds ratio in one sentence.__ 
+
+```{r, include=TRUE, results='asis'}
+# Unadjusted Model
+mc1 <- glm(METHICSE ~ PREVHOSP, family = binomial, data = nilton)
+
+# Adjusted
+mc2 <- glm(METHICSE ~ PREVHOSP + AGECAT + SEX + PREANTBU, family = binomial, data = nilton)
+
+stargazer(mc1, mc2,
+		  type = "latex", header = FALSE,
+		  title = "Association between prior hosptialization and MRSA",
+		  no.space = FALSE, single.row = FALSE,
+		  apply.coef = exp,
+		  ci = TRUE, p.auto = FALSE, report = "vc*s",
+		  ci.custom = list(exp(confint(mc1)), exp(confint(mc2))),
+		  covariate.labels = c("Previous Hospitalization", "Age > 55", "Sex", "Prior Antibiotics"),
+		  column.labels = c("Crude", "Adjusted"),
+		  table.placement = "H"
+)
+```
+
+The $OR = `r exp(coef(mc2)[2])`$ for prevalent MRSA in those with prior hospitalization after adjustment for age > 55 years, sex, and prior antibiotic usage.
+
+__3D. Run a model with three product terms between the exposure (previous hospitalization) with age category, sex, and antibiotic use. The additional three terms should be the product of PREVHOSP with AGECAT, SEX, and PREANTBU respectively. Include all three product terms in one model. What is the odds ratio for prevalent MRSA in patients with previous hospitalization in the past 6 months compared to those without hospitalization among women less than 55 years old who did not use antibiotics in the past three months?__ 
+
+```{r}
+# Model...
+md <- glm(METHICSE ~ PREVHOSP + AGECAT + SEX + PREANTBU + PREVHOSP*AGECAT + PREVHOSP*SEX + PREVHOSP*PREANTBU, family = binomial, data = nilton)
+
+# Data subsets
+newdata1 <- data.frame(PREVHOSP = 1, SEX = 0, AGECAT = 0, PREANTBU = 0)
+newdata2 <- data.frame(PREVHOSP = 0, SEX = 0, AGECAT = 0, PREANTBU = 0)
+
+### Predict function below
+```
+
+$$OR_{MRSA} = `r exp(predict(md, newdata1))/exp(predict(md, newdata2))`$$
+
+__3E. Run a likelihood ratio test for the addition of three product terms for interaction in part 3D (between previous hospitalization with age category, sex, and antibiotic use). Test the null hypothesis that all three beta coefficients for the interaction terms = 0). What is the -2ln likelihood for the full and reduced models? How many degrees of freedom are there for the likelihood ratio test? What is the p-value for the result? What is your interpretation about interaction?__ 
+
+```{r}
+# Reduced model = mc2, full model = md
+l <- lmtest::lrtest(mc2, md)
+lchi <- l$Chisq[2]
+lp <- l$`Pr(>Chisq)`[2]
+ldf <- l$Df[2]
+```
+
+This is a case of comparing nested models, as the full model is the reduced model with the addition of interaction terms. Testing against the null hypothesis, that the interaction terms all have a beta-coefficient of 0, we can use the likelihood ratio test.
+
+- The -2LogLikelihood for the reduced model is `r logLik(mc2)` 
+- The -2LogLikelihood for the full model is `r logLik(md)`
+
+For the likelihood ratio test, there are `r ldf` degrees of freedome. The $\chi^{2} = `r lchi`$, with a $p=`r lp`$. This suggests we do not have enough evidence to reject the null hypothesis, and can accept that the interaction terms to have $\beta = 0$. 
+
+There are no significant interactions between PREVHOSP and AGECAT/SEX/PREANTBU. The full model including interactions is not more informative or a better fit than the reduced model.
+
+\newpage
+
+# Question 4 - Kaplan Meier Curves with Censoring
+
+A prospective student is considering her course schedule and trying to determine if she should take MSCR534. Use the tables below to determine the two-year survival of two groups, those who recently took MSCR 534 (534=1) and those that did not (534=0).
+
+__4A. Fill in the missing cells in Table 2 and Table 3.__
+
+__Table 2__:
+
++----------+----------+----------+----------+----------+----------+
+| Event    | Number   | Number   | Number   | Pr       | 534      |
+| time     | of       | of       | censored | oportion | status   |
+|          | s        | deaths   |          | s        |          |
+| (Months) | urvivors |          |          | urviving |          |
++==========+==========+==========+==========+==========+==========+
+| 0        | 24       | 0        | 0        | 1        | 1        |
++----------+----------+----------+----------+----------+----------+
+| 2        | 24       | 1        | 1        | 0.958    | 1        |
++----------+----------+----------+----------+----------+----------+
+| 6        | 22       | 1        | 2        | 0.915    | 1        |
++----------+----------+----------+----------+----------+----------+
+| 12       | 19       | 0        | 2        | 0.915    | 1        |
++----------+----------+----------+----------+----------+----------+
+| 24       | 17       | 2        | 3        | 0.807    | 1        |
++----------+----------+----------+----------+----------+----------+
+
+__Table 3__:
+
++----------+----------+----------+----------+----------+----------+
+| Event    | Number   | Number   | Number   | Pr       | 534      |
+| time     | of       | of       | censored | oportion | status   |
+|          | s        | deaths   |          | s        |          |
+| (Months) | urvivors |          |          | urviving |          |
++==========+==========+==========+==========+==========+==========+
+| 0        | 30       | 0        | 0        | 1        | 0        |
++----------+----------+----------+----------+----------+----------+
+| 4        | 30       | 1        | 2        | 0.967    | 0        |
++----------+----------+----------+----------+----------+----------+
+| 12       | 27       | 2        | 2        | 0.895    | 0        |
++----------+----------+----------+----------+----------+----------+
+| 16       | 23       | 1        | 3        | 0.856    | 0        |
++----------+----------+----------+----------+----------+----------+
+| 24       | 19       | 3        | 4        | 0.721    | 0        |
++----------+----------+----------+----------+----------+----------+
+
+__4B. Graph the Kaplan Meier curve for each of the tables (by hand is fine). Graph the survival curves on the same graph. Hint: the Y axis should be from 0 to 1.0 and the X axis should be from 0 to 24 months.__
+
+```{r, include=TRUE, out.width="50%"}
+# Xaxis for both groups
+time1 <- c(0,2,6,12,24)
+time0 <- c(0,4,12,16,24)
+
+# KM survival
+surv1 <- c(1,0.958, 0.915, 0.915, 0.807)
+surv0 <- c(1,0.967, 0.895, 0.856, 0.721)
+
+# Data frames for both groups
+grp1 <- data.frame(t = time1, st = surv1)
+grp0 <- data.frame(t = time0, st = surv0)
+
+# Plot
+ggplot() +
+  geom_step(data = grp1, aes(x = t, y = st), color = "blue") +
+  geom_step(data = grp0, aes(x = t, y = st), color = "red") +
+  ylim(0,1) +
+  labs(
+    title = "Survival of students in MSCR 534",
+    x = "Time in Months",
+    y = "Proportion of Survivors",
+    caption = "Red = No 534, Blue = Yes 534"
+  )
+```
+
+__4C. If the data above were true, would you take MSCR 534 again?__
+
+It appears that the survival trend for those that have not taken MSCR 534 is initially higher, but by two years, they are doing what appears to be significantly worse. I think I would take MSCR 534 again for that ~8% survival benefit it appears to confer over the long-term.
+
+\newpage
+
+# Question 5 - Midterm Question with Solution
+
+__Write a midterm exam question focused on nominal/ordinal logistic regression, survival analysis, or Cox proportional hazards models. Also include a solution to the question.__
+
+There is a longitudinal study on patients with lung cancer amongst several institutions. The event of interest was dying of lung cancer. Other measures included patient age, sex, weight loss, average meal size, and functional status (both ECOG and Karney scales). The investigation is evaluating the most important predictors of death by lung cancer with age, sex, weight loss, and functional status ( __age__, __sex__, __wt.loss__, __ph.ecog__). This dataset can be download as __lung.csv__, ( _meta: attached with assignment submission_ ).
+
+_5A. Assume that the proportional hazard model is correct. What are the most important predictors of death by lung cancer?_
+
+```{r, include=TRUE, echo=TRUE, results='asis'}
+# Require libraries
+library(tidyverse)
+library(survival)
+library(survminer)
+
+# Data set
+df <- as_tibble(lung)
+write_csv(lung, "lung.csv")
+
+# Set up survival object
+df$survobj <- with(df, Surv(time, status))
+
+# Model
+m <- coxph(survobj ~ age + sex + wt.loss + ph.ecog, data = df)
+
+# Display HR
+stargazer(m, type = "latex", header = FALSE,
+		  title = "Association between Predictors of Lung Cancer Death",
+		  no.space = FALSE, single.row = FALSE,
+		  apply.coef = exp,
+		  ci = TRUE, p.auto = FALSE, report = "vc*s",
+		  ci.custom = list(exp(confint(m))),
+		  covariate.labels = c("Age", "Sex", "Weight Loss", "ECOG"),
+		  column.labels = c("Adjusted Model"),
+		  table.placement = "H"
+)
+```
+
+_5B. Evaluate if the proportional hazard assumption can be made using Schoenfeld residuals. Plot the residuals. Interpret the findings._
+
+```{r, include=TRUE, echo=TRUE}
+# Test PH assumption
+t <- cox.zph(m)
+
+# Display findings
+t$table %>%
+	kable("latex", booktabs = TRUE, 
+		  caption = "Tests of PH Assumption for each Predictor") %>%
+	kable_styling(latex_options = "hold_position")
+```
+
+The p-values reported for the individual predictors suggest there is not enough evidence to reject the null hypothesis, as well as the global test, suggesting that the proportional hazards assumption can be accepted. This can be visualized with the graphical interpretation of the Schoenfeld residuals.
+
+```{r, include=TRUE, echo=TRUE}
+# Plot residuals
+ggcoxzph(t)
+```
+
+\newpage
+
+# Question 6 - Anderson Data
+
+Use the permanent dataset on Canvas named “Anderson” (in Problem Set 1 assignment) to answer questions 6A through 6D. The dataset consists of remission survival times (SURVT), measured in weeks, on 42 leukemia patients, half of whom get a new therapy (RX=0) and half of whom get a standard therapy (RX=1).  Control variables are SEX (1=male, 0=female) and log white blood cell count. The log white blood cell count is in two forms, (LOGWBC - continuous) and a three-level categorical variable (LWBC3). The variable STATUS indicates event (out of remission - coded 1) or censorship (coded 0).
+
+```{r}
+# Data
+anderson <- read_sas("anderson.sas7bdat")
+
+# Add surv vector
+anderson$survobject <- with(anderson, Surv(SURVT, STATUS))
+```
+
+__6A. Run PROC LIFETEST three times to perform log rank tests for the effects of 1) treatment, 2) log white blood cell count, and 3) for the effect of gender. State the null hypotheses (there are three) and report the p-values and decision.  Examine the survival plots.  Why do you think the log rank test for gender was not significant even though the estimated survival curves (for gender) look different?  Examine the log (-log) survival plots; does the PH assumption seem violated for any of the predictors?__  
+
+```{r, include=TRUE, out.width = "50%"}
+### Treatment
+survRx <- survfit(survobject ~ RX, data = anderson)
+
+# Plot KM
+ggsurvplot(survRx, data = anderson, conf.int = TRUE, pval = TRUE, risk.table = TRUE, risk.table.col = "strata", palette = viridis(n=2, option = "E"), ggtheme = theme_minimal(), legend.labs = c("New Tx", "Old Tx")) +
+	ggtitle("Survival by Treatment Arm")
+
+# Log rank test
+x <- survdiff(survobject ~ RX, data = anderson)
+```
+
+- $H_{0}$: The survival curves are the same between treatment arms.
+- $\chi^2=$ `r x$chisq`
+- p = `r pchisq(x$chisq, 1, lower.tail = FALSE)`
+
+We can see that treatment has a visually different survival curve (the new treatment arm has much better survival). The test statistics suggests that we have enough evidence to reject the null and conclude that the two curves are different.
+
+```{r, include=TRUE, out.width='50%'}
+### WBC
+survWbc <- survfit(survobject ~ LWBC3, data = anderson)
+
+# Plot
+ggsurvplot(survWbc, data = anderson, conf.int = TRUE, pval = TRUE, risk.table = TRUE, risk.table.col = "strata", palette = viridis(n=3, option = "E"), ggtheme = theme_minimal(), legend.labs = c("Low", "Mid", "High")) + 
+	ggtitle("Survival by WBC Count Category")
+
+# Log rank test
+x <- survdiff(survobject ~ LWBC3, data = anderson)
+```
+
+- $H_{0}$: The survival curves are the same between WBC categories.
+- $\chi^2=$ `r x$chisq`
+- p = `r pchisq(x$chisq, 1, lower.tail = FALSE)`
+
+We can see that WBC category each visually have different curves. The test statistics suggests that we have enough evidence to reject the null and conclude that the three curves are different.
+
+```{r, include=TRUE, out.width="50%"}
+### Sex
+survSex <- survfit(survobject ~ SEX, data = anderson)
+
+# Plot
+ggsurvplot(survSex, data = anderson, conf.int = TRUE, pval = TRUE, risk.table = TRUE, risk.table.col = "strata", palette = viridis(n=2, option = "E"), ggtheme = theme_minimal(), legend.labs = c("Female", "Male")) +
+	ggtitle("Survival by Sex")
+
+# Log rank test
+x <- survdiff(survobject ~ SEX, data = anderson)
+```
+
+- $H_{0}$: The survival curves are the same sex curves.
+- $\chi^2=$ `r x$chisq`
+- p = `r pchisq(x$chisq, 1, lower.tail = FALSE)`
+
+We can see that the sex curves seem to cross, but that males appear to have a better survival. Although they appear to be visually different, the test statistics suggest that there is insufficient evidence to reject the null hypothesis, and thus we can conclude that the curves are not different (at least in this model). The issue at hand may be the fact hte curves cross in the middle, suggesting differences in survival at different time periods, which may be confounding the relationship.
+
+```{r, include=TRUE, fig.height=2.5}
+# Log-Log plots 
+
+# Place into an ARRAY of plots
+par(mfrow=c(1,3))
+
+# Treatment
+plot(survfit(survobject ~ RX, data = anderson), 
+	 fun="cloglog", col = c("black", "red"),
+	 main = "Treatment Log-Log Curve",
+	 ylab = "Log-log (Survival Probability)",
+	 xlab = "Log (Survival Time)")
+
+# WBC category
+plot(survfit(survobject ~ LWBC3, data = anderson), 
+	 fun="cloglog", col = c("black", "red", "blue"),
+	 main = "WBC Count Log-Log Curve",
+	 xlab = "Log (Survival Time)")
+
+# Sex
+plot(survfit(survobject ~ SEX, data = anderson), 
+	 fun="cloglog", col = c("black", "red"),
+	 main = "Sex Log-Log Curve",
+	 xlab = "Log (Survival Time)")
+```
+
+When examining the log-log plots, we can visually assess the proportional hazards assumption. The plots appear proportional for both Treatment and WBC, but not for Sex. There appears to be a cross over at ~ 10 months, and thus we should consider additional analysis after separting by time.
+
+__6B. For part 6B assume the PH assumption is not violated for any of the variables.  Run a Cox model with RX, LOGWBC, and SEX in the model.  State the model in terms of the hazard function. What are the estimated crude hazard ratio and adjusted hazard ratio for treatment? Interpret the adjusted hazard ratio in one sentence.__ 
+
+$$
+\begin{aligned}
+Crude: h(t) &= h_{0}t \times e^{\beta_{1}RX} \\ 
+Adjusted: h(t) &= h_{0}t \times e^{\beta_{1}RX + \beta_{2}LOGWBC + \beta_{3}SEX} \\ 
+\end{aligned}
+$$
+
+```{r, include=TRUE, results='asis'}
+# Unadjusted
+m <- coxph(survobject ~ RX, data = anderson)
+
+# Adjusted
+n <- coxph(survobject ~ RX + LOGWBC + SEX, data = anderson)
+
+# Output table
+stargazer(m, n,
+		  type = "latex", header = FALSE,
+		  title = "Association between Treatment and Survival",
+		  no.space = FALSE, single.row = FALSE,
+		  apply.coef = exp,
+		  ci = TRUE, p.auto = FALSE, report = "vc*s",
+		  ci.custom = list(exp(confint(m)), exp(confint(n))),
+		  covariate.labels = c("Treatment", "WBC Count", "Sex"),
+		  column.labels = c("Crude", "Adjusted"),
+		  table.placement = "H"
+)
+```
+
+The adjusted hazard ratio suggests that those that received standard treatment (RX=1) have a hazard rate 4.5 times that of the new treatment (RX=0), after adjustment for WBC count and sex. 
+
+__6C. Suppose it is decided that the PH assumption is violated just for the gender variable.  Run a stratified Cox model for the effect of treatment, adjusted for logwbc, with gender as the stratified variable (assuming no interaction with treatment).  What is the estimated hazard ratio for the effect of treatment?__  
+
+```{r, include=TRUE, results='asis'}
+# Model
+m <- coxph(survobject ~ RX + LOGWBC + strata(SEX), data = anderson)
+
+# Output table
+stargazer(m,
+		  type = "latex", header = FALSE,
+		  title = "Association between Treatment and Survival with Gender Stratification",
+		  no.space = FALSE, single.row = FALSE,
+		  apply.coef = exp,
+		  ci = TRUE, p.auto = FALSE, report = "vc*s",
+		  ci.custom = list(exp(confint(m))),
+		  covariate.labels = c("Treatment", "WBC Count"),
+		  column.labels = c("Stratified Model"),
+		  table.placement = "H"
+)
+```
+
+__6D. Now include a treatment-gender interaction term in the model. Create this interaction term in a SAS data step.  Note that SEX should not be in the model statement, but in the strata statement.  What is the Wald test p-value for the product term coefficient?  What are the estimated hazard ratios for treatment using the model with the product term?__  
+
+```{r, include=TRUE, results='asis'}
+# Create interaction term
+anderson$intRxSex <- interaction(anderson$RX, anderson$SEX)
+
+# Model
+m <- coxph(survobject ~ RX + LOGWBC + RX:SEX + strata(SEX), data = anderson)
+
+mSum <- summary(m)
+
+# Output model
+stargazer(m, type = "latex", header = FALSE,
+		  no.space = FALSE, single.row = FALSE,
+		  title = "Association between Tx and Survival with Sex Interaction",
+		  apply.coef = exp,
+		  ci = TRUE, p.auto = FALSE, report = "vc*s",
+		  ci.custom = list(exp(confint(m))),
+		  table.placement = "H"
+)
+```
+
+The adjusted hazard ratio is seen in the above table. The p-value for the product term coefficient is `r mSum$coefficients[3,5]`.

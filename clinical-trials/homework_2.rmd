@@ -1,0 +1,152 @@
+---
+title: "MSCR 520: Homework 2"
+author: "Anish Shah"
+date: "March 4th, 2020"
+output: pdf_document
+latex_engine: xelatex
+always_allow_html: yes
+header-includes:
+  - \usepackage{dcolumn}
+  - \usepackage{float}
+  - \usepackage{graphicx} 
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+  - \usepackage{caption}
+  - \usepackage{mathtools}
+  - \usepackage{amsmath}
+  - \captionsetup[table]{labelformat=empty}
+---
+
+```{r setup, include = FALSE}
+# Knitr options
+knitr::opts_chunk$set(
+  cache = TRUE,
+  warning = FALSE,
+  eval = TRUE,
+  echo = FALSE,
+  include = FALSE,
+  message = FALSE,
+  dpi = 600,
+  dev = "png",
+  options("scipen" = 999, "digits" = 5),
+  tinytex.verbose = TRUE,
+  fig.align = "center"
+)
+
+options(xtable.comment = FALSE)
+
+# Libraries
+library(tidyverse)
+library(knitr)
+library(rmarkdown)
+library(tinytex)
+library(magrittr)
+library(kableExtra)
+library(haven)
+library(broom)
+library(stargazer)
+library(lme4)
+library(compareGroups)
+library(DiagrammeR)
+library(survival)
+library(survminer)
+library(ggfortify)
+library(viridis)
+library(rms)
+library(pwr)
+library(lmtest)
+```
+
+# Question 1
+
+- OCP and SBP in women
+- SBC in OCP and non OCP users have normal distribution
+- $s = 17 mmHg$
+
+_a) To detect minimum difference of 5 mmHg SBP between OCP groups, how many women needed? 90% power of two sided test with 1% significance. Equal allocation._
+
+```{r, echo=TRUE}
+x <- pwr.t.test(d = 5/17, sig.level = 0.01, power = 0.90, type = "two.sample")
+```
+
+Will need `r ceiling(x$n * 2)` total.
+
+_b) Comment on magnitude, offer suggestions._
+
+This is a large number of individuals, may be difficult to obtain/fund this size of a study. Determine if can decrease stringency of parameters (e.g. increase alpha, decrease beta, decrease effect size difference). Likely okay to decrease power to 80% and increase significance level to 0.05.
+
+_c) Have 100 in OCP and 100 in non-OCP groups. True diff of mean SBP = 5 (expected). Expect OCP to have higher mean. $alpha = 0.01$. How much power?_
+
+```{r, echo=TRUE}
+x <- pwr.t.test(d = 5/17, sig.level = 0.01, type = "one.sample", n = 100)
+```
+
+The power will be `r round(x$power * 100, digits = 1)`%.
+
+
+# Question 2
+
+- Randomized trial on weight gain and diet in women
+- high fiber versus low fiber
+- outcome = 10 lb weight gain
+- anticipate that 20% of low fiber will gain weight, and 10% of high fiber will gain weight
+
+_a) Number needed to randomize in each group to get $\beta = 80%$ and $\alpha = 0.05$._
+
+```{r, echo=TRUE}
+x <- pwr.2p.test(h = ES.h(p1 = 0.20, p2 = 0.10), sig.level = 0.05, power = 0.80)
+```
+
+Need `r ceiling(x$n)` in each group to achieve prescribed power/significance.
+
+_b) N=250 per group. How much power?_
+
+```{r, echo=TRUE}
+x <- pwr.2p.test(h = ES.h(p1 = 0.20, p2 = 0.10), sig.level = 0.05, n = 250)
+```
+
+Power will be `r round(x$power * 100, digits = 1)`%.
+
+# Question 3
+
+- new CCB for angina
+- unknown effect on HR
+
+_a) N=20, have HR change of $s = 10 bpm$, $\alpha = 0.05$. What power to detect 5 bpm of HR (either increase or decrease)._
+
+```{r}
+x <- pwr.t.test(n = 20, d = 5/10, type = "paired", sig.level = 0.05, alternative = "two.sided")
+```
+
+Power will be `r round(x$power * 100, digits = 1)`%.
+
+_b) 80% power is goal to detect difference of mean HR by 5 bpm (either direction), $s = 10 bpm$, how many patients needed?_
+
+```{r}
+x <- pwr.t.test(d = 5/10, type = "paired", sig.level = 0.05, alternative = "two.sided", power = 0.80)
+```
+
+Will need `r ceiling(x$n)` patients.
+
+# Question 4
+
+- Paper by Hoenig and Heisey (2001)
+
+_a) What does Fig. 1 suggest?_
+
+Suggests that "observed" power are the outcome of (e.g. dependent on) the p-value that is tested. It shows us that at the typical p-value of 0.05, the power will be estimated at 80%. Thus, observed power is not helpful in interpreting the results of findings. The figure helps exemplify the "power approach paradox" (PAP) the authors describe - at a certain p-value, the power is lower then expected (e.g. p = 0.05, power = 50%), and this is interpreted potentially incorrectly such that it is possible to have missed detecting a rejecting of the null hypothesis. (The opposite interpretation is that the p-value gives statistical evidence to reject the null).
+
+_b) What is posthoc power calculation?_
+
+After a study has been completed, a post-hoc power analysis is considered to help interpret the findings from the statistical test of the hypothesis. The calculation is "recommended" to be made when the findings are not significant, and thus assessing power may help identify the probability that rejecting the null hypothesis was correct (failure to do so would be a type 2 error).
+
+_c) Why do posthoc power calculations not help in interpreting study results?_
+
+One of the limitations is that the initial statistical testing generates confidence intervals. Power calculations to tell us if the hypothesis is outside of the confidence interval does not add additional value, because intrinsic to the CI calculation we know that the hypothesized parameter is predicted to be within a CI, correlating with the p-value. 

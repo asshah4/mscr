@@ -1,0 +1,434 @@
+---
+title: "MSCR 509: High Dimensional Analysis"
+subtitle: "Homework 6"
+author: Anish Shah
+date: February 24, 2020
+output: pdf_document
+latex_engine: xelatex
+header-includes:
+  - \usepackage{dcolumn}
+  - \usepackage{float}
+  - \usepackage{graphicx} 
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+
+---
+
+```{r setup, global_options, include=FALSE}
+knitr::opts_chunk$set(
+	cache = TRUE,
+	warning = FALSE,
+	eval = TRUE,
+	echo = FALSE,
+	include = FALSE,
+	message = FALSE,
+	dpi = 600,
+	dev = "png",
+	options("scipen" = 999, "digits" = 4)
+)
+
+library(knitr)
+library(tinytex)
+library(rmarkdown)
+library(tidyverse)
+library(broom)
+library(haven)
+library(magrittr)
+library(lmtest)
+library(compareGroups)
+library(pROC)
+library(stargazer)
+library(caret)
+library(e1071)
+library(kableExtra)
+library(ResourceSelection)
+library(glmulti)
+library(cvAUC)
+```
+
+# Description
+
+Data were collected as part of a larger study at Baystate Medical Center in Springfield, MA. This data set contains information on 189 births to women seen in the obstetrics clinic. Fifty-nine of these births were low birth weight. The goal of the current study was to determine whether the variables included in the data set were risk factors for having low birth weight in the clinic population being served by the Baystate Medical Center.  Actual observed variable values have been modified to protect subject confidentiality.
+
+Variables are below. Description, and then SAS variable (short name):
+
+- Low Birth Weight (‘no’ = Birth Weight >= 2500g, ‘yes’ = Birth Weight < 2500g) ... *LOW_BIRTH_WEIGHT  (LOW)
+- Age of the Mother in Years ... AGE
+- Weight in Pounds at the Last Menstrual Period ... WEIGHT (LWT)
+- Race (‘white’, ‘black’, ‘other’) ... *RACE
+- Smoking Status During Pregnancy (‘yes’, ‘no’) ... *SMOKE
+- History of Premature Labor (‘yes’, ‘no’) ... *PREMATURE_LABOR (PTD)
+- History of Hypertension (‘yes’, ‘no’) ... *HYPERTENSION (HT)
+- Presence of Uterine Irritability (‘yes’, ‘no’) ... *UTERINE_IRRITABILITY (UI)
+
+* These variables are coded in SAS as ‘character variables,’ and therefore require use of the CLASS statement to model properly. Be sure to specify ‘reference cell coding’ and the chosen reference group. For example, CLASS RACE (param=ref ref='white').
+
+```{r}
+# Read in data set on birth weights
+birthweights <- read_sas("birthweights.sas7bdat")
+
+# Clean data
+df <- birthweights
+df$low_birth_weight %<>% factor(levels = c("no", "yes"), labels = c(0,1))
+df$race %<>% factor(levels = c("white", "other", "black"))
+df$smoke %<>% factor()
+df$premature_labor %<>% factor()
+df$hypertension %<>% factor()
+df$uterine_irritability %<>% factor()
+
+# Save
+birthweights <- df
+```
+
+# Question 1
+
+_Fit a logistic regression model for predicting the risk of low birth weight in terms of age, race, and smoking status.  Use reference cell coding, with reference groups as “not-smoking" and "white” for smoking status and race, respectively._
+
+- Write down the predicted logistic regression model.
+- Interpret the odds ratios corresponding to smoking and race.
+
+$$
+log\left(\frac{P(LBW)}{1-P(LBW)}\right) = \beta_{0} + \beta_{1}age + \beta_{2}race + \beta_{3}smoke \\
+$$
+
+```{r, include=TRUE, results='asis'}
+# Data
+df <- birthweights
+
+# Model
+m <- glm(low_birth_weight ~ age + race + smoke, family = binomial, data = df)
+
+# Present data
+stargazer(m, header = FALSE, type = "latex",
+		  no.space = FALSE,
+		  title = "Prediction of LBW Babies",
+          model.numbers = FALSE,
+          single.row = FALSE, 
+          apply.coef = exp,
+          ci = TRUE, p.auto = FALSE, report = "vc*s",
+          ci.custom = list(exp(confint(m))),
+		  table.placement = "H"
+)
+```
+
+The OR for having a LBW baby if the patient is black (compared to white) is __4.33__, with adjustment for age and smoking status. The OR for having a LBW if a smoker (versus nonsmoker) is __2.64__.
+
+# Question 2
+
+_When evaluating a predictive rule, it is recommended to use a validation set.  Split the data into training (70%) and validation (30%) sets, using the seed 19850604 in SAS._
+
+```{r}
+# Data 
+df <- birthweights
+
+# Set seed
+set.seed(19850604)
+
+# Split data 70/30
+sample <- df$low_birth_weight %>%
+	createDataPartition(p = 0.7, list = FALSE)
+train.data <- df[sample,]
+test.data <- df[-sample,]
+```
+
+The data has been split into 70/30 training and test data.
+
+_Using your model selection procedure of choice, develop a logistic regression model using only the training set. Write down the final estimated model, and provide justification. (Use a forward/backward/stepwise selection /hybrid procedure to decide on final main effects model, use backward selection (w/ a 0.05 significance threshold) to test for potential pairwise interactions.)  _
+
+```{r, include=TRUE, results='asis'}
+# Training data
+df <- train.data
+
+# Glmulti model selection
+mTop <- glmulti(low_birth_weight ~ age + race + smoke, data = df,
+		level = 2,
+		crit = "aic", family = binomial,
+		confset = 5, method = "h",
+		plotty = FALSE, report = FALSE)
+
+# Recreate for stargazing
+mTrain <- glm(low_birth_weight ~ race + smoke + race*smoke, data = df, family = binomial)
+
+# Present data
+stargazer(mTrain, header = FALSE, type = "latex",
+		  no.space = FALSE,
+		  title = "Best Model from Training Data",
+          model.numbers = FALSE,
+          single.row = FALSE, 
+          apply.coef = exp,
+          ci = TRUE, p.auto = FALSE, report = "vc*s",
+          ci.custom = list(exp(confint(mTrain))),
+		  table.placement = "H"
+)
+```
+
+The final model, as seen above, was selected using an exhaustive model selection method, with pairwise interactions tested bidirectionally between all terms. The final model incorporates race and smoking status, and adjusts for the interaction between smoking and race. 
+
+# Question 3
+
+_Perform the Hosmer-Lemeshow test on the training set, using the 'lackfit' option._
+
+- Report the test statistic and p-value.
+- Interpret the results.
+- Construct a calibration plot, and interpret.
+
+```{r, include=TRUE}
+# Training data set
+# Model m is made from training data
+m <- glm(low_birth_weight ~ age + race + smoke, family = binomial, data = train.data)
+
+h <- hoslem.test(m$y, fitted(m), g = 10)
+
+# Test probability
+# Calibration plot
+x <- cbind(h$observed, h$expected) %>% as_tibble()
+x$total <- x$y0 + x$y1
+x$obsprop <- x$y1 / x$total
+x$exprop <- x$yhat1 / x$total
+
+# Ggplot
+ggplot(data=x, aes(x=obsprop, y=exprop)) + 
+	geom_point(shape = 1) +
+	geom_abline(intercept = 0, slope = 1) +
+	xlim(0,1) +
+	ylim(0,1) + 
+	theme_minimal() +
+	labs(
+		title = "Calibration Plot",
+		x = "Observed Proportion",
+		y = "Expected Proportion"
+	)
+```
+
+__This is for the full training data, as the question does not specify to use the final model that has interaction terms.__
+
+The Hosmer-Lemeshow test on the training data had a $\chi^2$ of `r h$statistic` for `r h$parameter` degrees of freedom, with `r h$p.value`. This suggsts that, for an $\alpha = 0.05$, we have insufficient evidence to reject the null hypothesis, and thus can accept the model fits the data well. 
+
+The calibration plot shows that there is a linear pattern to the 10 groups from the Hosmer-Lemeshow test that roughly fit the 1:1 correlation line. This helps show that although there is a pattern, with the training set, there are potentially outliers or random noise that may need to be addressed (e.g. bootstrapping or multiple iterations).
+
+# Question 4
+
+_Derive the ROC curve and AUC for your final model, using the training data. Comment on the predictability of this model?_
+
+This ROC curve is from the final model, after evaluating 1st and 2nd level interactions of parameters. This appears to be a somewhat decent predictability of the data, wiht an $AUC > 0.7$.
+
+```{r, include=TRUE}
+# Fitted model
+pred <- predict(mTrain, type = "response")
+
+# ROC curve
+curve <- roc(train.data$low_birth_weight ~ pred, 
+	auc = TRUE,
+	ci = TRUE)
+
+# Plot
+ggroc(curve) + 
+	theme_minimal() +
+	labs(
+		title = "ROC Curve for Training Model",
+		caption = paste("AUC =", auc(curve)),
+		x = "Specificity",
+		y = "Sensitivity"
+	) + 
+	geom_abline(intercept = 1, slope = 1)
+```
+
+# Question 5
+
+Use the validation set to evaluate your final model.
+
+- Report the AUC.   
+- Show a ROC plot for validation dataset.
+- Comment on the overall performance of your final model.
+
+Below is the predictivity of our model via ROC curve. It similarly shows an $AUC > 0.7$, suggesting reasonable predictability. It is likely that the test data is underpowered to fully evaluate this model.
+
+```{r, include=TRUE}
+# Create validation data to test out model
+mTest <- glm(low_birth_weight ~ race + smoke + race*smoke, data = test.data, family = binomial)
+
+# Fitted model
+pred <- predict(mTest, type = "response")
+
+# ROC curve
+curve <- roc(test.data$low_birth_weight ~ pred, 
+	auc = TRUE,
+	ci = TRUE)
+
+# Plot
+ggroc(curve) + 
+	theme_minimal() +
+	labs(
+		title = "ROC Curve for Testing Model",
+		caption = paste("AUC =", auc(curve)),
+		x = "Specificity",
+		y = "Sensitivity"
+	) + 
+	geom_abline(intercept = 1, slope = 1)
+```
+
+# Question 6
+
+_State your final estimated model and explain how you would interpret for future patients.  Specifically, describe patient characteristics that are associated with the outcome._
+
+```{r, include=TRUE, results='asis'}
+# Stargaze it
+stargazer(mTest, header = FALSE, type = "text",
+		  no.space = FALSE,
+		  title = "Best Model from Training Data",
+          model.numbers = FALSE,
+          single.row = FALSE, 
+          apply.coef = exp,
+          ci = TRUE, p.auto = FALSE, report = "vc*s",
+          ci.custom = list(exp(confint(mTest))),
+		  table.placement = "H"
+)
+```
+
+In this validation dataset, the parameter statistics have a wider confidence interval, suggesting we are underpowered. However, even with this, smoking remains a strong predictor of LBW babies. Compared to the training model, the trend of black race and smoking appear to be high risk factors, and thus would be patients of special interest or of a higher risk category. 
+
+# Question 7
+
+Choose a cut-point that you think is reasonable for deriving a classification rule from your final model.
+
+- Specify your classification rule.
+- Report the sensitivity and specificity in the training set.
+- Report the sensitivity and specificity in the validation set.
+- Comment on the performance of your classification rule.
+
+```{r, include=TRUE}
+# Show plots overall in row
+par(mfrow = c(1,2))
+
+### For training model, mTrain
+
+# Sequence of cutpoints
+cutoffs <- seq(0.1, 0.9, 0.1)
+accuracy <- NULL
+for(i in seq(along = cutoffs)) {
+	prediction <- ifelse(mTrain$fitted.values >= cutoffs[i], 1, 0)
+	accuracy <- c(accuracy, length(which(train.data$low_birth_weight == prediction))/length(prediction)*100)
+}
+
+# Plot training
+plot(cutoffs, accuracy, pch = 19, type = 'b', col = "steelblue", 
+	 main = "Training Model Performance", xlab = "Cutpoint", ylab = "Accuracy (%)")
+
+### For testing model, mTest
+
+# Sequence of cutpoints
+cutoffs <- seq(0.1, 0.9, 0.1)
+accuracy <- NULL
+for(i in seq(along = cutoffs)) {
+	prediction <- ifelse(mTest$fitted.values >= cutoffs[i], 1, 0)
+	accuracy <- c(accuracy, length(which(test.data$low_birth_weight == prediction))/length(prediction)*100)
+}
+
+# Plot training
+plot(cutoffs, accuracy, pch = 19, type = 'b', col = "steelblue", 
+	 main = "Test Model Performance", xlab = "Cutpoint", ylab = "Accuracy (%)")
+```
+
+Based on assessing the cutpoint at multiple levels, the value of __0.5__ is reasonable to use for an accuracy of approximately 70%. The graphs here help to show my confidence in the performance of my classification rule.
+
+```{r}
+# Prediction
+pred <- ifelse(predict(mTrain, train.data, type = "response") > 0.5, 1, 0)
+actual <- as.numeric(as.character(train.data$low_birth_weight))
+
+# Training conf matrix
+tbl <- table(pred, actual)
+```
+
+For the training data set, with the specified cutpoint, the sensitivity of the model is `r sensitivity(tbl)`, and the specificity is `r specificity(tbl)`.
+
+```{r}
+# Prediction
+pred <- ifelse(predict(mTest, test.data, type = "response") > 0.5, 1, 0)
+actual <- as.numeric(as.character(test.data$low_birth_weight))
+
+# Training conf matrix
+tbl <- table(pred, actual)
+```
+
+For the test/validation data set, with the specified cutpoint, the sensitivity of the model is `r sensitivity(tbl)`, and the specificity is `r specificity(tbl)`.
+
+# Question 8
+
+Given that the dataset is not very large, the Principal Investigator suggests that the whole data set should be used to develop the model.  Build your final model, using the entire data set.  
+
+- State your estimated model.
+- Report the AUC under this model. Do you think this AUC is an accurate estimate of your model's true predictive abilities? Is it an under- or over-estimate?
+- Using cross-validation, estimate the AUC.
+- Discuss the results.  How well does your model predict?  Would you consider using this model in the clinical setting?
+
+```{r, include=TRUE, results='asis'}
+# Model m is made from training data
+df <- birthweights
+df$low_birth_weight %<>% as.character() %>% as.numeric()
+
+f <- glm(low_birth_weight ~ race + smoke, family = binomial, data = df)
+
+# Present data
+stargazer(f, header = FALSE, type = "latex",
+		  no.space = FALSE,
+		  title = "Model using Entire Data Set",
+          model.numbers = FALSE,
+          single.row = FALSE, 
+          apply.coef = exp,
+          ci = TRUE, p.auto = FALSE, report = "vc*s",
+          ci.custom = list(exp(confint(m))),
+		  table.placement = "H"
+)
+```
+
+The model stated above in table format. Using hte full dataset, the "best" model, using exhaustive model selection processes, yields the same model with the training data set. 
+
+```{r, include=TRUE}
+
+# Fitted model
+df$pred <- predict(f, type = "response")
+
+# ROC curve
+curve <- roc(df$low_birth_weight ~ df$pred,
+	auc = TRUE,
+	ci = TRUE)
+
+### Complex cross validation set
+
+# Functions needed to CV
+iid_example <- function(data, V=10){
+.cvFolds <- function(Y, V){ #Create CV folds (stratify by outcome)
+Y0 <- split(sample(which(Y==0)), rep(1:V, length=length(which(Y==0))))
+Y1 <- split(sample(which(Y==1)), rep(1:V, length=length(which(Y==1))))
+folds <- vector("list", length=V)
+for (v in seq(V)) {folds[[v]] <- c(Y0[[v]], Y1[[v]])}
+return(folds)
+}
+.doFit <- function(v, folds, data){ #Train/test glm for each fold
+fit <- glm(Y~., data=data[-folds[[v]],], family=binomial)
+pred <- predict(fit, newdata=data[folds[[v]],], type="response")
+return(pred)
+}
+folds <- .cvFolds(Y=data$Y, V=V) #Create folds
+predictions <- unlist(sapply(seq(V), .doFit, folds=folds, data=data)) #CV train/predict
+predictions[unlist(folds)] <- predictions #Re-order pred values
+# Get CV AUC and confidence interval
+out <- ci.cvAUC(predictions=predictions, labels=data$Y, folds=folds, confidence=0.95)
+return(out)
+}
+
+# df modded
+df$Y <- df$low_birth_weight
+out <- iid_example(data=subset(df, select = c(Y, race, smoke)), V = 10)
+```
+
+The AUC is `r curve$auc` for the full data set. We see that it is lower than in the training or data set. I think this is a more reflective of the true predictive value of our model, but potentially influenced by noise or systemic bias in the data set initial creation. With 10-fold validation, the AUC is `r out$cvAUC`. It appears that this full model is less powerful/predictive than we would safely like for assess patients at risk for LBW. I would not use this for clinical testing at this point, however I would still point out that the risk is likely greater in both black race and smoking.
+
