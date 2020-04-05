@@ -1,0 +1,154 @@
+---
+title: "MSCR 509: High Dimensional Analysis"
+subtitle: "Homework 9"
+author: Anish Shah
+date: April 6, 2020
+output: pdf_document
+latex_engine: xelatex
+header-includes:
+  - \usepackage{dcolumn}
+  - \usepackage{float}
+  - \usepackage{graphicx} 
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+---
+
+```{r setup, global_options, include=FALSE}
+knitr::opts_chunk$set(
+	cache = TRUE,
+	warning = FALSE,
+	eval = TRUE,
+	echo = FALSE,
+	include = FALSE,
+	message = FALSE,
+	dpi = 600,
+	dev = "png",
+	options("scipen" = 999, "digits" = 4)
+)
+
+library(knitr)
+library(tinytex)
+library(rmarkdown)
+library(tidyverse)
+library(broom)
+library(haven)
+library(magrittr)
+library(lmtest)
+library(compareGroups)
+library(pROC)
+library(stargazer)
+library(caret)
+library(e1071)
+library(kableExtra)
+library(ResourceSelection)
+library(glmulti)
+library(cvAUC)
+library(glmnet)
+library(MASS)
+library(fdrtool)
+library(qvalue)
+```
+
+# Question 1
+
+_Consider the problem of disease-associated gene identification (See attached dataset cancer.sas7bdat). The data contains 33 cancer cases and 19 normal cases (rows). The expression of 10,000 genes (columns) was measured in these samples. We want to identify genes that differentially express between cancer samples and normal samples. Complete the following:_
+
+```{r}
+cancer <- read_sas("cancer.sas7bdat")
+```
+
+## Part A
+
+_Have SAS conduct 10,000 t-tests for a difference in average expression between cancer and normal cases for each of the 10,000 genes (you may use either method discussed in class, or a method of your own devising)._
+
+```{r, include=TRUE, echo = TRUE}
+# Lengthen data so each experiment is a single row
+df <-
+	cancer %>%
+	pivot_longer(-c(id, group), names_to = "gene", values_to = "expression")
+
+# T-tests
+results <-
+	df %>%
+	group_by(gene) %>%
+	do(tidy(t.test(.$expression ~ .$group)))
+
+```
+
+This method of applying 10,000 tests is tedious. It was performed using R, as seen above. This resutls in 10,000 t-tests performed.
+
+## Part B
+
+_Applying no correction for multiple testing, how many genes would we declare significant at significance level=0.05? Applying the Bonferroni correction, how many genes would we declare significant at an overall alpha of 0.05? Applying the FDR correction, how many genes would we declare significant if we control the FDR to 0.05?_
+
+```{r}
+# As datatable
+dt <- as.data.table(results)
+
+# With bonferroni correction
+dt[, p.bonferroni := p.adjust(p.value, method = "bonferroni")]
+
+# With FDR correction
+dt[, p.fdr := p.adjust(p.value, method = "BH")]
+dt[, p.fdr05 := qvalue(p.value, fdr.level = 0.05)$significant]
+
+
+```
+
+Using the above data, without correcting for multiple testing, out of the original `r nrow(dt)`, there are `r nrow(dt[p.value < 0.05])` significant genes that meet uncorrected $\alpha = 0.05$. After applying the __Bon Ferroni correction__, there are `r nrow(dt[p.bonferroni < 0.05])` significant genes. . Using teh __FDR correction__, also known as the __Benjamini-Hockberg correction__, there are `r sum(dt$p.fdr05)` significant genes.
+
+## Part C
+
+_Apply the FDR correction while controlling the FDR to 5%, 10%, and 20%. How many genes would we declare significant in each case?  How many false leads would we expect in each case?_
+
+```{r}
+# With FDR correction at different levels
+dt[, p.fdr10 := qvalue(p.value, fdr.level = 0.10)$significant]
+dt[, p.fdr20 := qvalue(p.value, fdr.level = 0.20)$significant]
+
+# Comparison
+dt[, .(p.value, p.fdr05, p.fdr10, p.fdr20)]
+```
+
+With the $FDR = 5%$, the number of genes that are significant would be `r sum(dt$p.fdr05)`. For $FDR = 10%$, the number would be `r sum(dt$p.fdr10)`. For $FDR = 20%$, the number would be `r sum(dt$p.fdr20)`. In each case, we would expect a proportion (the FDR level), of the significant findings to be false positives. Thus, 5%, 10%, and 20% of the significant findings.
+
+## Part D
+
+_Using the Heatmap code (cancer_heatmap.sas) provide a picture of significant genes using different methods. Comment on the results (You are NOT required to understand the programming of the code since it involves some sophisticated programming)._
+
+
+As seen in this heatmap, the significant findings by method of p-value adjustment is quite different. Using an uncorrected approach, there are a large number of important genes, but with strict correction by Bonferroni, we have only a handful of important genes. However, using an FDR approach finds a moderate, in-between, approach allowing us to have several potentially useful genes to explore without an excessive amount.
+
+```{r, include = TRUE}
+# Dataset ...
+df <- dt[, .(gene, p.value, p.bonferroni, p.fdr)] %>%
+	pivot_longer(-gene, names_to = "methods", values_to = "pval")
+	
+# Clean off genes
+df$gene <- as.numeric(gsub("x", "", df$gene))
+df %<>% arrange(gene)
+
+df$methods %<>% factor(labels = c("Bonferroni", "FDR", "Uncorrected"))
+
+# Heatmap
+# x axis is groups of p-value methods
+# y axis is gene names
+ggplot(df, aes(x = methods, y = gene, fill = pval)) +
+	geom_tile() +
+	scale_fill_viridis_c(direction = -1) + 
+	theme_minimal() +
+	labs(
+		x = "Adjustment Methods",
+		y = "Genes (ordered by name)",
+		title = "Significant Genes by different P-value Methods"
+	)
+```
+
+

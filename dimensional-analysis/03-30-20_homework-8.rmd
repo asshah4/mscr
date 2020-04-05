@@ -1,0 +1,83 @@
+---
+title: "MSCR 509: High Dimensional Analysis"
+subtitle: "Homework 7"
+author: Anish Shah
+date: March 23, 2020
+output: pdf_document
+latex_engine: xelatex
+header-includes:
+  - \usepackage{dcolumn}
+  - \usepackage{float}
+  - \usepackage{graphicx} 
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+---
+
+```{r setup, global_options, include=FALSE}
+knitr::opts_chunk$set(
+	cache = TRUE,
+	warning = FALSE,
+	eval = TRUE,
+	echo = FALSE,
+	include = FALSE,
+	message = FALSE,
+	dpi = 600,
+	dev = "png",
+	options("scipen" = 999, "digits" = 4)
+)
+
+library(knitr)
+library(tinytex)
+library(rmarkdown)
+library(tidyverse)
+library(broom)
+library(haven)
+library(magrittr)
+library(lmtest)
+library(compareGroups)
+library(pROC)
+library(stargazer)
+library(caret)
+library(e1071)
+library(kableExtra)
+library(ResourceSelection)
+library(glmulti)
+library(cvAUC)
+library(glmnet)
+library(MASS)
+```
+
+
+# Question 1
+
+_This data (hotdogs.sas7bdat) are taken  from the DASL (Data and Story Library) files, http://lib.stat.cmu.edu/DASL/Stories/Hotdogs.html. Fifty-four hot dog brands were tested for their caloric content. The hotdogs were sorted into three categories: poultry, beef, and meat (mostly pork and beef, with up to 15% poultry).  Please answer the following, using the appropriate statistical techniques introduced in lecture._
+
+## Part A
+
+_Are there differences in the caloric content of the three groups?_
+
+```{r, include = TRUE}
+# read in data
+hotdogs <- read_sas("hotdogs.sas7bdat")
+hotdogs$Type %<>% factor()
+
+# There are three types of hotdogs: beef, meat, or poultry
+compareGroups(Type ~ Calories, data = hotdogs, p.corrected = TRUE) %>%
+	createTable(show.p.overall = TRUE, show.p.mul = TRUE) %>%
+	export2md(., format = "latex", size = 8, caption = "Multiple Comparison B/W Hotdogs and Calories")
+```
+
+Yes, there are differences between the hotdog types and the calorie contents. There is an overall difference in means (with the overall $alpha = 0.05/k$, where $k = 3$). The p.overall value presented is corrected using the Bonferroni correction. The subgroup p-values are set to an $alpha = 3$
+
+## Part B
+
+_If there are differences, which specific underlying means are different?_
+
+Based on the above content, the difference between means are mainly between beef and poultry, and then again with mean versus poultry. The difference between beef and meat are quite similar (e.g. cannot reject the null hypothesis such that the calories are not significantly different). 
