@@ -21,14 +21,10 @@ Part 3. Comparing measures of association;
 
 
 *Suppose your study goal is to assess the relationship 
-between alcohol use
-(the exposure) and risk of death (outcome);
+between alcohol use (the exposure) and risk of death (outcome);
 
 *Another potential confounder is birthplace (covariate '_foreign') 
 status ;
-
-
-
 
 *****PART 1 ESTIMATING RISK RATIOS WITH LOG BINOMIAL REGRESSION;
 
