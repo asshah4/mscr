@@ -1,0 +1,236 @@
+---
+title: "MSCR 520: Homework 3"
+author: "Anish Shah"
+date: "April 8th, 2020"
+output: pdf_document
+latex_engine: xelatex
+always_allow_html: yes
+header-includes:
+  - \usepackage{dcolumn}
+  - \usepackage{float}
+  - \usepackage{graphicx} 
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+  - \usepackage{caption}
+  - \usepackage{mathtools}
+  - \usepackage{amsmath}
+  - \captionsetup[table]{labelformat=empty}
+---
+
+```{r setup, include = FALSE}
+# Knitr options
+knitr::opts_chunk$set(
+  cache = TRUE,
+  warning = FALSE,
+  eval = TRUE,
+  echo = FALSE,
+  include = FALSE,
+  message = FALSE,
+  dpi = 600,
+  dev = "png",
+  options("scipen" = 999, "digits" = 5),
+  tinytex.verbose = TRUE,
+  fig.align = "center"
+)
+
+options(xtable.comment = FALSE)
+
+# Libraries
+library(tidyverse)
+library(knitr)
+library(rmarkdown)
+library(tinytex)
+library(magrittr)
+library(kableExtra)
+library(haven)
+library(broom)
+library(stargazer)
+library(lme4)
+library(compareGroups)
+library(DiagrammeR)
+library(survival)
+library(survminer)
+library(ggfortify)
+library(viridis)
+library(rms)
+library(pwr)
+library(lmtest)
+library(mice)
+```
+
+_The research question is: _
+
+_Controlling for gestation, plurality, mother age, and mother white, what is the difference in birth weight between smoking mothers and nonsmoking mothers? Notice that in the research question above, not all the variables in the data set are used. This is because proc mi notoriously involves extremely time-consuming calculations. To make sure that Citrix does not log you off while you are running SAS, I have to take a subset of babies born in 2012 as well as select less than a handful of variables._
+
+_GENERAL DIRECTIONS: Whenever you use proc mi to answer the questions below, always use seed=83743. In practice, you can use any seed or use a new seed whenever you call a new mi procedure._
+
+Name | Description
+--- | ---
+bwt | birth weight (g)
+female | sex of child (1=female, 0=male)
+plurality | number of children at delivery (1=single, 2=twins, : : :, 5=quintuplets or higher)
+gestation | number of weeks (17; 18; : : : ; 47)
+birth_order | birth order (1=1st child, 2=2nd child, : : :, 8=8th or higher child)
+mother_age | mother’s age (year)
+mother_white | mother’s race (1=white, 0=otherwise)
+mother_college | mother’s education (1=at least college degree, 0=no college degree)
+mother_single | mother’s marital status (1=single, 0=married)
+mother_bmi | mother’s prepregnancy bmi (kg/m2)
+mother_smoking | mother’s smoking status (1=yes, 0=no)
+wic | WIC receipt (1=yes, 0=no)
+prenatal | number of prenatal care visits (0; 1; 2; : : : ; 49)
+resident | resident status (1=U.S. resident, 0=foreign resident)
+father_age | father’s age (year)
+father_white | father’s race (1=white, 0=otherwise)
+father_college | father’s education (1=at least college degree, 0=no college degree)
+
+```{r}
+birth <- read_sas("birth2012subset.sas7bdat")
+```
+
+# Question 1
+
+## Part A
+
+_Using an O’Brien-Fleming sequential plan for detecting early evidence of superior efficacy, write decision rules that can be included in the data monitoring committee interim analysis guidelines (also known as the data monitoring committee charter). The plan is to conduct 5 interim analyses plus 1 final look (6 total looks), and assume a two-sided 5% significance level._
+
+The O'Brien-Fleming approach is a common group sequential approach. In this case, we will conduct 6 analyses (5 interim and 1 final look). We will use a two-sided 5% significance level (overall $alpha = 0.05$). We will set a $K = 5$. This would set a series of boundaries of for each iteration:
+
+1. $Z_{1} = 4.56$
+1. $Z_{2} = 3.23$
+1. $Z_{3} = 2.63$
+1. $Z_{4} = 2.28$
+1. $Z_{5} = 2.04$
+
+We would stop analysis if the interim analysis value crossed the boundaries established by the O'brien-Fleming approach.
+
+## Part B
+
+_Using a Pocock sequential plan, write the corresponding decision rules._
+
+If a Pocock sequential plan was used, then a similar interim significance level would be used to maintain an overall $\alpha = 0.05$ approach. As there are 5 interim analyses, we would use $C_{i} = 2.4$. If the study crosses this, then we can terminate the study and reject the $H_{0}$.
+
+## Part C
+
+_Compare the O’Brien-Fleming and Pocock stopping rules._
+
+The Pocock stopping rules include that hte final analysis is conducted at a much smaller alpha than an $\alpha = 0.05$. The O'Brien-Fleming approach allows for the final analysis to have a higher $\alpha$, but requires more conservatism (higher critical values) in the earlier interim analyses.
+
+# Question 2
+
+## Part A
+
+_When performing a complete case analysis, how many cases will be used? How many cases will be ignored?_
+
+Out of this data set, the complete cases are `r nrow(na.omit(birth))`. There are overall `r nrow(birth)` cases, thus the cases that would be ignored are `r nrow(birth) - nrow(na.omit(birth))`
+
+## Part B
+
+_Write a multiple linear regression model to find an estimate of the difference in birth weight between smoking mothers and non-smoking mothers, holding plurality, mother age, gestation, and mother white fixed. Provide a 95% confidence interval._
+
+```{r}
+# Linear Model
+m <- lm(bwt ~ mother_smoking + plurality + mother_age + gestation + mother_white, data = birth)
+```
+
+The overall model is:
+
+$$
+BirthWeight = \beta_{0} + \beta_{1}MotherSmoking + \beta_{2}Plurality + \beta_{3}MotherAge + \beta_{4}Gestation + \beta_{5}MotherWhite
+$$
+
+```{r, include=TRUE, results='asis'}
+stargazer(m, type = "latex", header = FALSE,
+          ci = TRUE, digits = 3,
+          title = "Multiple Linear Regression for Birthweight")
+```
+
+# Question 3
+
+## Part A
+
+_Summarize each variable’s missingness by reporting the number of missing values for the variable and the percentage missing._
+
+```{r, include=TRUE}
+compareGroups(~ bwt + mother_smoking + plurality + mother_age + gestation + mother_white, data = birth, simplify = FALSE) %>%
+  createTable(show.descr=FALSE, show.all = TRUE) %>%
+  missingTable() %>%
+  export2md()
+```
+
+## Part B
+
+_Is the pattern of missingness monotone or arbitrary? What is the most prevalent pattern of missingness in this dataset?_
+
+```{r, include=TRUE, fig.height=6}
+md.pattern(birth, plot = TRUE, rotate = TRUE) %>% kable(format = "latex", booktabs = TRUE, caption = "Missingness Pattern")
+```
+
+In this data set, the missingness is monotonic. When __mother_white__ is missing, __mother_smoking__ is missing as well, for a total of 550 observations.  If __mother_smoking__ is missing only, there are 239 observations.
+
+# Question 4
+
+_Single vs multiple imputation. Why is multiple imputation preferred over single imputation?_
+
+Single imputation leads to replacing a missing value with some other value (the mean, etc). Multiple imputation fills the missing value with a range of plausible values (allowing the inclusion of uncertainty). The number of multiple imputations (e.g. 3 sets of data, 15 sets, etc) are then anlayzed together giving a range of results, which are more likely to contain the true sample/population parameters. 
+
+# Question 5
+
+_Missing data mechanisms. Multiple imputation assumes MAR. How is MAR different from MCAR? How is MAR different from NMAR?_
+
+MAR is missing at random, while MCAR is missing completely at random, and NMAR is not missing at random. MAR suggests that the probability of the data missing is unrelated to its value, however the missing data may be related to ther varuables. MCAR means that missingness is unrelated to the values of any other variables (present or missing), and is usually an overly strong assumption. MAR is different from NMAR, suggests that the value of hte unobserved varaible itself predicts its own missingness, thus cannot be ignored. 
+
+# Question 6
+
+_Perform multiple imputation to create m = 6 complete data sets. Be sure to include mother white and mother smoking in the CLASS statement, and use the LOGISTIC function to impute mother white and mother smoking after the MONOTONE statement. Use the following order of the variables: bwt, plurality, mother age, gestation, mother white, mother smoking. Recall that SAS will follow the variable order that you specify. Copy and paste the Missing Data Patterns table generated by SAS._
+
+```{r}
+# Impute data
+imputed <- mice(birth, m=6, method = "logreg")
+```
+
+```{r, include = TRUE}
+# Print out predictor matrix
+imputed$predictorMatrix %>% kable(format = "latex", booktabs = TRUE, caption = "Imputation Patterns") %>% kable_styling(latex_options = "HOLD_position")
+```
+
+# Question 7
+
+_Analysis on imputed data sets. Build a linear regression model using bwt as outcome and mother smoking as primary exposure, using plurality, mother age, gestation, mother white, as control variables. Because there are 6 imputed data sets, you will have 6 sets of s. Combine the results of the 6 imputations._
+
+## Part A
+
+_Report an estimate of the difference in birth weight between smoking mothers and non-smoking mothers, holding plurality, mother age, gestation, and mother white fixed? Provide a 95% confidence interval._
+
+```{r}
+# Linear model regressions
+fitimp <- with(imputed, lm(bwt ~ mother_smoking + plurality + mother_age + gestation + mother_white))
+
+# Combined data
+tbl <- pool(fitimp) %>% summary(conf.int = TRUE) 
+
+tbl %>% 
+  kable(format = "latex", booktabs = TRUE, caption = "Combined Regressions for the Multiple Imputations (x6)") %>%
+  kable_styling(latex_options = "HOLD_position")
+
+```
+## Part B
+
+_Conclusion. Compare the results obtained using multiple imputation and those obtained using complete case analysis. Describe your observations._
+
+Here is without imputation:
+
+`r tidy(m, conf.int = TRUE) %>% kable(format = "latex", booktabs = TRUE, caption = "Model with Missing") %>% kable_styling(latex_options = "HOLD_position")`
+
+Here is with multiple imputation:
+
+`r tbl %>% kable(format = "latex", booktabs = TRUE, caption = "Combined Regressions for the Multiple Imputations (x6)") %>% kable_styling(latex_options = "HOLD_position")`
+
+The estimates with missing and imputed data are very similar. The effect of __mother_smoking__ and __mother_white__ on __bwt__ remains with almost completely overlapping confidence intervals. With imputation, the confidence intervals may be slightly narrowed (as the estimates were more powered).

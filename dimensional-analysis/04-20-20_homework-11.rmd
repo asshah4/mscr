@@ -1,0 +1,135 @@
+---
+title: "MSCR 509: High Dimensional Analysis"
+subtitle: "Homework 11"
+author: Anish Shah
+date: April 20, 2020
+output: pdf_document
+latex_engine: xelatex
+header-includes:
+  - \usepackage{dcolumn}
+  - \usepackage{float}
+  - \usepackage{graphicx} 
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+always_allow_html: true
+---
+
+```{r setup, global_options, include=FALSE}
+knitr::opts_chunk$set(
+	cache = TRUE,
+	warning = FALSE,
+	eval = TRUE,
+	echo = FALSE,
+	include = FALSE,
+	message = FALSE,
+	dpi = 600,
+	dev = "png",
+	options("scipen" = 999, "digits" = 4)
+)
+
+library(knitr)
+library(tinytex)
+library(rmarkdown)
+library(tidyverse)
+library(broom)
+library(haven)
+library(magrittr)
+library(lmtest)
+library(compareGroups)
+library(pROC)
+library(stargazer)
+library(caret)
+library(e1071)
+library(kableExtra)
+library(ResourceSelection)
+library(glmulti)
+library(cvAUC)
+library(glmnet)
+library(MASS)
+library(fdrtool)
+library(qvalue)
+library(mice)
+library(factoextra)
+library(data.table)
+library(Hmisc)
+```
+
+# Question 1
+
+The file places.txt contains data from Places Rated Almanac data (Boyer and Savageau) which rates 329 metropolitan areas of the United States according to nine composite variables:
+
+- Climate and Terrain 
+- Housing 
+- Health Care & Environment 
+- Crime 
+- Transportation 
+- Education 
+- The Arts 
+- Recreation 
+- Economics 
+
+Each composite variable is constructed from available data, for example, housing costs are the sum of 3 components: utility bills, property taxes, and mortgage payments. Utility bills are a function of gas and electric prices, heating degree days (when the temperature is less than 65 0 F), air conditioning degree days (when the temperature is more than 800 ), and how common it is for houses to be heated electrically rather than by gas.  
+
+Notes:
+
+- The data for many of the variables are strongly skewed to the right. 
+- The natural log transformation was used to normalize the data.
+- The places_data.sas file has code to read dataset and log transform 9 variables.
+
+Researchers are interested in learning ranking of places to live in the United States.  One way of doing this is to principle component analysis.
+
+```{r}
+# Read in places.txt file
+places <- fread("places.txt")
+
+# Name columns
+columns <- Cs(climate, housing, health, crime, trans, educate, arts, recreate, econ, id)
+names(places) <- columns
+
+# Log transform data
+places[, (columns) := lapply(.SD, log), .SD = columns]
+```
+
+## Part 1
+
+_Report the principal components (i.e., the loadings associated with each PC) of these variables based on correlation matrix (i.e. without COV option)._
+
+```{r, include = TRUE}
+# Principal components and loadings based on cor matrix
+# Eigenvalues/vectors
+pca <- prcomp(places, scale = TRUE, center = TRUE)
+
+# print loadings
+kable(pca$rotation, format = "latex", caption = "Loadings of PC") %>%
+	kable_styling(font_size = 8)
+```
+
+## Part 2
+
+_How many principal components would you select to summarize this data? Explain why?_
+
+```{r, include = TRUE}
+fviz_screeplot(pca)
+```
+
+Based on the scree plot of the variance, we can see that by the __PC4__ we have dipped below the eigenvalue of 1, thus limiting the amount of novel information we are receiving. The first three PC would explain approximately 56% of the total variance, thus may be sufficient in our analysis. 
+
+
+## Part 3
+
+_What are the interpretations of the first three PCs?_
+
+When we look at the contributing loadings of PC1-3, we see that PC1 and PC2 use a linear combination of all the variables for the most part. However, PC3 only relies on several variables: _climate, trans, educate, econ, and id_. We can however summarize and say that hte first 3 PC explain almost 6% of the variance, and thus may be a sufficient to start modeling to predict rankings of places to live.
+
+## Part 4
+
+_Explain why PCA is a good technique for this problem._
+
+PCA is a good technique for this problem because there are 10 attributes that are contributing to rankings, however each of them are likely to have some level of correlation. A regression model for rankings will likely be biased and underpowered at estimating the best rankings because of overfitting (with too many variables). With just PC1-3 we can make a fairly well fitting model.

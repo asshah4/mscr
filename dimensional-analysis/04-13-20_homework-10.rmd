@@ -1,0 +1,195 @@
+---
+title: "MSCR 509: High Dimensional Analysis"
+subtitle: "Homework 10"
+author: Anish Shah
+date: April 13, 2020
+output: pdf_document
+latex_engine: xelatex
+header-includes:
+  - \usepackage{dcolumn}
+  - \usepackage{float}
+  - \usepackage{graphicx} 
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+always_allow_html: true
+---
+
+```{r setup, global_options, include=FALSE}
+knitr::opts_chunk$set(
+	cache = TRUE,
+	warning = FALSE,
+	eval = TRUE,
+	echo = FALSE,
+	include = FALSE,
+	message = FALSE,
+	dpi = 600,
+	dev = "png",
+	options("scipen" = 999, "digits" = 4)
+)
+
+library(knitr)
+library(tinytex)
+library(rmarkdown)
+library(tidyverse)
+library(broom)
+library(haven)
+library(magrittr)
+library(lmtest)
+library(compareGroups)
+library(pROC)
+library(stargazer)
+library(caret)
+library(e1071)
+library(kableExtra)
+library(ResourceSelection)
+library(glmulti)
+library(cvAUC)
+library(glmnet)
+library(MASS)
+library(fdrtool)
+library(qvalue)
+library(mice)
+library(factoextra)
+```
+
+# Question 1
+
+_A medical anthropologist is interested in investigating whether there are any differences between male Egyptian skulls of different time periods from the area of Thebes. Various measurements were made on male Egyptian skulls from two different time periods: 4000 BC and 150 AD._
+
+_In the EGYPT data set, thirty skulls are available from each time period. For each skull,	the following four variables were measured:_
+	
+- Maximal Breadth of Skull (MB)
+- Basibregmatic Height of Skull (BH)
+- Basialveolar Length of Skull (BL)
+- Nasal Height of Skull (NH)
+
+```{r}
+# Data
+egypt <- read_sas("egypt.sas7bdat")
+```
+
+
+## Part A
+
+_Using descriptive statistics, present the data in a table to address the question of Egyptian skulls of different time periods from the area of Thebes._
+
+```{r, include=TRUE}
+# Descriptive statistics
+compareGroups(Period ~ MB + BH + BL + NH, data = egypt) %>%
+	createTable(show.all = TRUE, show.p.overall = TRUE, show.p.trend = TRUE) %>%
+	export2md()
+```
+
+## Part B
+
+_Perform a univariate analysis to determine the association of each variable with the time period (4000BC vs 150 AD) and present in a Table. Interpret results._
+
+```{r, include=TRUE, results='asis'}
+# Clean data
+df <- egypt
+df$Period %<>% factor(levels = c("4000 BC", "150 AD"))
+
+# Univarate models
+mb <- glm(Period ~ MB, family = binomial("logit"), data = df)
+bh <- glm(Period ~ BH, family = binomial("logit"), data = df)
+bl <- glm(Period ~ BL, family = binomial("logit"), data = df)
+nh <- glm(Period ~ NH, family = binomial("logit"), data = df)
+
+# Stargaze
+stargazer(mb, bh, bl, nh, header=FALSE, type = "latex",
+		  apply.coef = exp, digits = 2, report = "vc*s", p.auto = FALSE,
+		  ci.custom = list(exp(confint(mb)), exp(confint(bh)), exp(confint(bl)), exp(confint(nh))),
+		  title = "OR of Being from 150 AD instead of 4000 BC",
+		  font.size = "small"
+)
+
+```
+
+
+## Part C
+
+_Perform a multivariate analysis to develop a model for predicting the time period in terms of four variables. Present results in a table and interpret your results._
+
+```{r, results='asis', include=TRUE}
+# Multivariate model
+m <- glm(Period ~ MB + BH + BL + NH, family = binomial("logit"), data = df)
+
+# Stargaze
+stargazer(m, header=FALSE, type = "text",
+		  apply.coef = exp, digits = 2, 
+		  report = "vc*s", p.auto = FALSE,
+		  ci.custom = list(exp(confint(m))),
+		  title = "Multivariate Prediction of Time Period",
+		  font.size = "small"
+)
+```
+
+Based on a multivariate analysis, MB and BL are helpful in predicting the time period of hte skull. As MB increases, the OR for being from 150 AD increases, and as BL increases, the OR for being from 150 AD decreases.
+
+## Part D
+
+_Perform a PCA analysis on the four variables and comment on the variation explained by each principal component. How many PCAs would you select to describe the measurements of skulls?_
+
+```{r, include=TRUE}
+# Generate PCA
+egyptPrince <- prcomp(df[2:5], center = TRUE, scale = TRUE)
+
+# Plot side by side
+par(mfrow=c(1,2))
+
+# Plot the data
+plot(egyptPrince, type = "l", npcs=4, main = "Screeplot of All PCs")
+abline(h = 1, col="red", lty=5)
+legend("topright", legend=c("Eigenvalue = 1"), col=c("red"), lty=5, cex=0.6)
+
+# Cumulative variance
+egyptSun <- cumsum(egyptPrince$sdev^2 / sum(egyptPrince$sdev^2))
+plot(egyptSun, xlab = "PC Number", ylab = "Amount of Explained Variance", main = "Cumulative Variance Plot")
+abline(v=3, col = "blue", lty = 5)
+abline(h = 0.842, col = "blue", lty = 5)
+legend("topleft", legend=c("Cut-off at PCA #3"), col=c("blue"),
+	   lty=5, cex=0.6)
+```
+
+```{r, include=TRUE}
+# Plots
+#par(mfrow=c(1,2))
+
+# Graphing variables
+fviz_pca_ind(egyptPrince, col.ind = "cos2", gradient.cols = "RdPu", repel = TRUE)
+
+fviz_pca_var(egyptPrince, col.var = "contrib", gradient.cols = "RdPu", repel = TRUE)
+```
+
+This suggests that most of our variance of findings can explained by the first 2 PC, but the 3rd PC brings us past the eigenvalue of 1. Thus, at minimum, teh 4th PC is not very helpful in explaining hte variance total. 
+
+```{r, include=TRUE}
+# Plot first two components
+plot(egyptPrince$x[,1], egyptPrince$x[,2], xlab = "PC1 (36.8%)", ylab="PC2 (27.8%)", main = "PC1 versus PC2")
+```
+
+Just the first two components explain about 64.6% of hte total variance of the egyptian skulls.
+
+```{r, include=TRUE}
+# Plot
+fviz_pca_ind(egyptPrince, geom.ind = "point",
+			 pointshape = 21,
+			 fill.ind = egypt$Period,
+			 col.ind = "black",
+			 col.var = "black",
+			 palette = viridis::viridis_pal(option="E")(2),
+			 legend.title = "Period",
+			 addEllipses = TRUE, ellipse.level = 0.95,
+			 repel = TRUE) +
+	ggtitle("PC1 and PC2 from 4-feature to Predict Period")
+```
+
+Based on this information, I would likely just use 2 principal components to help identify the period of the skulls. 
+
