@@ -1,0 +1,272 @@
+---
+title: "MSCR 534: Final Exam"
+author: "Anish Shah"
+date: "May 1, 2020"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+always_allow_html: yes
+header-includes:
+  - \usepackage{dcolumn}
+  - \usepackage{float}
+  - \usepackage{graphicx} 
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+  - \usepackage{caption}
+  - \captionsetup[table]{labelformat=empty}
+---
+
+```{r global_options, include = FALSE}
+# Knitr options
+knitr::opts_chunk$set(
+  cache = TRUE,
+  warning = FALSE,
+  eval = TRUE,
+  echo = TRUE,
+  include = TRUE,
+  message = FALSE,
+  dpi = 600,
+  dev = "png",
+  options("scipen" = 999, "digits" = 3),
+  tinytex.verbose = TRUE,
+  tidy = FALSE
+)
+
+options(xtable.comment = FALSE)
+
+library(tidyverse)
+library(knitr)
+library(rmarkdown)
+library(magrittr)
+library(compareGroups)
+library(haven)
+library(kableExtra)
+library(DiagrammeR)
+library(stargazer)
+library(DescTools)
+library(data.table)
+library(epitools)
+library(broom)
+library(sandwich)
+library(lmtest)
+library(Hmisc)
+library(splines)
+library(riskRegression)
+library(prodlim)
+library(janitor)
+library(epiR)
+library(mediation)
+library(survival)
+library(survminer)
+library(viridis)
+```
+
+# Question 1
+
+Answered in word document.
+
+# Question 2
+
+```{r}
+B0 = -4.4195 # Intercept
+B1 = 1.0221 # FPM exposure
+B2 = 0.4210 # age <60
+B3 = 0.5600 # age >= 60
+B4 = 0.7712 # FPM with young age
+B5 = 0.8211 # FPM with old age
+
+# 65 year old with high FPM exposure
+estimate = B0 + B1 + B3 + B5
+cumInc = exp(estimate)
+
+# 38 year old with low FPM exposure
+estimate = B0 + B2
+cumInc = exp(estimate)
+
+# 42 with High FPM compared to 70 with low FPM
+RR = exp(B1 + B2 + B4) / exp(B3)
+```
+
+# Question 3
+
+Answered in word document.
+
+# Question 4
+
+Answered in word document.
+
+# Question 5
+
+Table 3 filled out using this information.
+
+```{r describe the hip fx}
+# Data
+q5 <- read_sas("q5.sas7bdat") %>% 
+	clean_names() 
+
+df <- q5
+
+# Risk in hip fracture
+df$hip55 %<>% factor(levels = c(1,0), labels = c("Fx", "NoFx"))
+df$livea %<>% factor(levels = c(1,0), labels = c("Alone", "Others"))
+
+tbl <- table(df$livea, df$hip55)
+epitbl <- epi.2by2(tbl)
+
+# Print
+print(epitbl)
+```
+
+Verified odds ratio via comparison of groups.
+
+```{r compare the hip fx, results='asis'}
+# Crude risk of hip fracture
+compareGroups(hip55 ~ livea, data = df) %>%
+	createTable(show.all = TRUE, show.ratio = TRUE) %>%
+	export2md(format = "latex", caption = "Comparison of Hip Fx and Loneliness")
+```
+
+Adjusted OR done through logistic regression.
+
+```{r regress the hip fx, results='asis'}
+m <- glm(hip55 ~ livea + alc + ager, family = binomial("logit"), data = q5)
+
+# Make pretty
+stargazer(m, header = FALSE, type = "latex", 
+					apply.coef = exp, 
+					p.auto = FALSE,
+					report = "vc*s", title = "Adjusted OR for Hip Fx",
+					ci.custom = list(exp(confint(m))))
+
+```
+
+# Question 6
+
+We will need to establish several relationships to study the mediation effects of depression on the relationship between living alone and hip fractures. 
+
+We can test the relationship of living alone with depression. 
+
+```{r sad and lonely}
+# Data
+df <- q5
+
+# Tidy
+df$livea %<>% factor(levels = c(0,1), labels = c("Others", "Alone"))
+df$dep %<>% factor(levels = c(0,1), labels = c("Happy", "Sad"))
+df$hip55 %<>% factor(levels = c(0,1), labels = c("NoFx", "Fx"))
+
+compareGroups(dep ~ livea, data = df) %>%
+	createTable(show.ratio = TRUE, show.all = TRUE) %>%
+	export2md(format = "latex", caption = "Loneliness and Depression")
+```
+
+We can then test the relationship of the potential mediator of depression on hip fractures.
+
+```{r}
+# Data as above
+compareGroups(hip55 ~ dep, data = df) %>%
+	createTable(show.ratio = TRUE, show.all = TRUE) %>%
+	export2md(format = "latex", caption = "Depression and Fx")
+```
+
+Now, since depression is associated with both exposure and outcome, we can test it as a mediator using an adjusted regression model.
+
+```{r, results='asis'}
+# Three models
+m1 <- glm(hip55 ~ livea, family = binomial("logit"), data = q5)
+m2 <- glm(hip55 ~ dep, family = binomial("logit"), data = q5)
+m3 <- glm(hip55 ~ dep + livea, family = binomial("logit"), data = q5)
+
+# Make pretty
+stargazer(m1, m2, m3, header = FALSE, type = "latex", 
+					apply.coef = exp, 
+					p.auto = FALSE,
+					report = "vc*s", title = "Mediation Analysis of Loneliness, Sadness, and Fractures",
+					ci.custom = list(exp(confint(m1)), exp(confint(m2)), exp(confint(m3)))
+					)
+```
+
+To mesure effects, we need to look at measured relationships in the causal model.
+
+- Living Alone -> Depression
+- Living Alone + Depression -> Hip Fx
+
+```{r}
+# Models
+m <- glm(dep ~ livea, family = binomial("logit"), data = q5)
+y <- glm(hip55 ~ livea + dep, family = binomial("logit"), data = q5)
+
+# Mediation
+res <- mediate(m, y, treat = "livea", mediator = "dep", boot = TRUE, sims = 500)
+summary(res)
+```
+
+This supports the idea the depression only accounts for a very small part (indirect effect) of the total effect of living alone on hip fractures.
+
+# Question 7
+
+This creates a Kaplan Meier curve for assessing lung cancer incidence by smoking strata.
+
+```{r take in q7 data, fig.align='center'}
+q7 <- read_sas("q7.sas7bdat") %>%
+	clean_names()
+
+# Create a KM graph (exclude death during f/u)
+df <- subset(q7, outcome != 1)
+df$outcome[df$outcome == 2] <- 1
+df$smoke %<>% factor()
+fit <- survfit(Surv(survival_t, outcome) ~ smoke, data = df)
+ggsurvplot(
+	fit, 
+	data = df, 
+	risk.table = TRUE,
+	pval = TRUE,
+	conf.int = TRUE,
+	ggtheme = theme_minimal(),
+	palette = viridis_pal(option = "E")(2)
+)
+```
+
+Now we need to calculate Cox regression to create a hazard rate ratio, as well the subdistribution models.
+
+```{r}
+# Data excluding those who died from analysis, as above
+df <- subset(q7, outcome != 1)
+df$outcome[df$outcome == 2] <- 1
+df$smoke %<>% factor()
+df$agecat %<>% factor()
+df$sex %<>% factor()
+
+# Cox regression
+m1 <- coxph(Surv(survival_t, outcome) ~ smoke + agecat + sex, data = df)
+tidy(m1, exponentiate = TRUE, conf.int = TRUE) %>%
+	kable(format = "latex", 
+				booktabs = TRUE, 
+				caption = "Adjusted HR for Lung Cancer") %>%
+	kable_styling(latex_options = "HOLD_position")
+
+# Subdistribution for lung cancer
+df <- q7
+df$smoke %<>% factor()
+df$agecat %<>% factor()
+df$sex %<>% factor()
+
+m2 <- FGR(Hist(survival_t, outcome, cens.code = 0) ~ smoke + agecat + sex, 
+					cause = 2, 
+					data = df)
+print(m2)
+
+# Subdistribution for death
+m3 <- FGR(Hist(survival_t, outcome, cens.code = 0) ~ smoke + agecat + sex, 
+					cause = 1, 
+					data = df)
+print(m3)
+```
+

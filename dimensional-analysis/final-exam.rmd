@@ -1,0 +1,146 @@
+---
+title: "MSCR 509: High Dimensional Analysis"
+subtitle: "Homework 11"
+author: Anish Shah
+date: April 20, 2020
+output: pdf_document
+latex_engine: xelatex
+header-includes:
+  - \usepackage{dcolumn}
+  - \usepackage{float}
+  - \usepackage{graphicx} 
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+always_allow_html: true
+---
+
+```{r setup, global_options, include=FALSE}
+knitr::opts_chunk$set(
+	cache = TRUE,
+	warning = FALSE,
+	eval = TRUE,
+	echo = FALSE,
+	include = FALSE,
+	message = FALSE,
+	dpi = 600,
+	dev = "png",
+	options("scipen" = 999, "digits" = 4)
+)
+
+library(knitr)
+library(tinytex)
+library(rmarkdown)
+library(tidyverse)
+library(broom)
+library(haven)
+library(magrittr)
+library(lmtest)
+library(compareGroups)
+library(pROC)
+library(stargazer)
+library(caret)
+library(e1071)
+library(kableExtra)
+library(ResourceSelection)
+library(glmulti)
+library(cvAUC)
+library(glmnet)
+library(MASS)
+library(fdrtool)
+library(qvalue)
+library(mice)
+library(factoextra)
+library(data.table)
+library(Hmisc)
+library(DescTools)
+library(tidymodels)
+library(ggdendro)
+```
+
+# Question 1
+
+Answer in exam document.
+
+# Question 2
+
+```{r}
+b0 = -1.0781 # intercept
+b1 = 0.0512 # PSA
+b2 = -0.5788 # Race (black = 0)
+
+# Estimate African american with PSA of 15
+p = exp(b0 + b1*15 + b2*0)/(1 + exp(b0 + b1*15 + b2*0))
+```
+
+# Question 3
+
+Answer in document.
+
+# Question 4
+
+```{r}
+# 60k tests Bonferroni correction
+a = 0.05
+n = 60000
+p = a/n
+
+```
+
+# Question 5
+
+```{r}
+# High dimensional data
+cancer <- read_sas("cancer_stage.sas7bdat")
+
+# Multiple t-testing
+long <-
+	cancer %>% 
+	pivot_longer(cols = starts_with("x"), names_to = "gene", values_to = "expr") %>%
+	group_by(gene)
+
+results <-
+	long %>%
+	group_by(gene) %>%
+	do(tidy(t.test(.$expr ~ .$group)))
+
+# Gene numbers...
+results$gene %<>% as.numeric(gsub("x", "", .))
+results %<>% arrange(gene)
+
+# Trim data
+results <- results[c("gene", "estimate", "statistic", "p.value")]
+
+# Add P-value options
+results$pbon <- p.adjust(results$p.value, method = "bonferroni")
+results$pbh <- p.adjust(results$p.value, method = "BH")
+
+# Add 1% FDR
+results$qvalue <- qvalue::qvalue(results$p.value, fdr.level = 0.01)$significant
+results$qvalue %>% sum()
+sig <- results$gene[results$qvalue == TRUE]
+
+# Features for PCA
+features <- paste0("x", sig)
+
+# PCA
+pca <- prcomp(cancer[c(features)])
+
+# Plot scatter
+fviz_pca_ind(pca, 
+						 fill.ind = cancer$group, geom.ind = "point", pointshape = 21,
+						 palette = "jco", col.ind = "black", addEllipses = TRUE,
+						 repel = TRUE,
+						 title = "Cancer Grouping by PCA1 and PCA2",
+						 col.var = "black",
+						 legend.title = "Cancer status"
+) +
+	theme_minimal()
+```
+

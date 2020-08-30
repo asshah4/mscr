@@ -1,0 +1,176 @@
+---
+title: "MSCR 509: High Dimensional Analysis"
+subtitle: "Homework 11"
+author: Anish Shah
+date: April 20, 2020
+output: pdf_document
+latex_engine: xelatex
+header-includes:
+  - \usepackage{dcolumn}
+  - \usepackage{float}
+  - \usepackage{graphicx} 
+  - \usepackage{booktabs}
+  - \usepackage{longtable}
+  - \usepackage{array}
+  - \usepackage{multirow}
+  - \usepackage{wrapfig}
+  - \usepackage{colortbl}
+  - \usepackage{pdflscape}
+  - \usepackage{tabu}
+  - \usepackage{threeparttable}
+always_allow_html: true
+---
+
+```{r setup, global_options, include=FALSE}
+knitr::opts_chunk$set(
+	cache = TRUE,
+	warning = FALSE,
+	eval = TRUE,
+	echo = FALSE,
+	include = FALSE,
+	message = FALSE,
+	dpi = 600,
+	dev = "png",
+	options("scipen" = 999, "digits" = 4)
+)
+
+library(knitr)
+library(tinytex)
+library(rmarkdown)
+library(tidyverse)
+library(broom)
+library(haven)
+library(magrittr)
+library(lmtest)
+library(compareGroups)
+library(pROC)
+library(stargazer)
+library(caret)
+library(e1071)
+library(kableExtra)
+library(ResourceSelection)
+library(glmulti)
+library(cvAUC)
+library(glmnet)
+library(MASS)
+library(fdrtool)
+library(qvalue)
+library(mice)
+library(factoextra)
+library(data.table)
+library(Hmisc)
+library(DescTools)
+library(tidymodels)
+library(ggdendro)
+```
+
+# Question 1
+
+_The data set in the attached SAS program (crime.sas) contains variables describing the types of crime rates in each U.S. state.  A researcher is interested in summarizing these crime rates and determining whether the Southern States have different patterns of crimes than the Northern States.  Use a cluster analysis to determine which states have similar crime rates._
+
+```{r}
+# crimes
+crimes <- read_csv("crimes.csv")
+
+
+# Make it ready
+rec <- 
+	recipe(STATE ~., data = crimes) %>%
+	step_center(all_predictors()) %>%
+	step_scale(all_predictors()) %>%
+	prep(data = crimes)
+
+```
+
+## Part A
+
+_Perform hierarchical clustering on the data, and provide the resulting dendrogram._
+
+```{r dendrogram, include = TRUE}
+# Data
+df <- bake(rec, new_data = crimes)
+df <- crimes
+df %<>% column_to_rownames(var = "STATE")
+
+# Find dissimilarities
+d <- dist(df, method = "euclidean", diag = FALSE)
+
+# Hierarchical clustering
+hcl <- hclust(d, method = "complete")
+cluster <- hclust(dist(crimes[,2:8], method = "euclidean"), method = "complete")
+
+# Plot dendrogram
+ggdendrogram(hcl, rotate = TRUE)
+```
+
+
+## Part B
+
+_Report the distance (similarity) measure and linkage function used._
+
+The distance method used was __euclidean__. The linkage function was __complete__ for the clustering.
+
+## Part C
+
+_How many clusters are there in the data?  Provide justification using the criteria discussed in class._
+
+There are in the original data labels for many states: _N_, _S_, _SE_, _SW_. With this clustering approach, we have to select how many iterations we would like for the solution. In this case, we should select somewhere between 3-6 clusters to approach the pre-existing or known clusters of geographic regions.
+
+```{r}
+# Cutree
+c3 <- cutree(hcl, k = 3)
+c4 <- cutree(hcl, k = 4)
+c5 <- cutree(hcl, k = 5)
+c6 <- cutree(hcl, k = 6)
+```
+
+Three clusters:
+
+`r table(c3)`
+
+Four clusters:
+
+`r table(c4)`
+
+Five clusters:
+
+`r table(c5)`
+
+If we use 5 clusters, then there are two states that have their own cluster. That state is `r c5[c5 == 3]`. These are geographically and culturally very similar, thus, would not divid this further.
+
+
+## Part D
+
+_Provide an interpretation of your final clustering solution, in the context of the original research question._
+
+```{r}
+table(c5, crimes$STATE)
+
+c5[c5 == 1]
+c5[c5 == 2]
+c5[c5 == 3]
+c5[c5 == 4]
+c5[c5 == 5]
+```
+
+When reviewing all the classification groups, we can see that although there are some patterns, where certain states tend to cluster together, it is not a clear division. We cannot easily argue that there is a robust difference between northern and southern states. 
+
+# Question 2
+
+_Read the article titled “Identifying Heterogeneity Among Injection Drug Users: A Cluster Analysis Approach."_
+
+## Part A
+
+_Summarize the findings of this article._
+
+This article used cluster analysis to characterize the population of injection drug users with the intent to identify novel behavioral patterns. They used information on syringe sharing, ethnicity, and drug types. They found seven clusters. Some of these cluster relationships were known from prior knowledge (e.g. certain drugs that go together, like petnazocine and methylphenidate). They confirmed that injection use and HCV were related. The novel relationships they found included female crystal methamphetamine users who had high-risk behaviors but low prevalence of blood-stream infections. This novel-group finding was a major take away from the article. 
+
+## Part B
+
+_Provide a brief discussion, including strengths and weaknesses of the cluster analysis approach._
+
+The most important part of any analyses is the data input stage. This data set uses community volunteers, which serves as a starting point for recruitment bias. They also used an age cut off of >15 years, which adds a bias to the data. Also, they had self-initiated recruitment, which likely biases away from high risk groups that are unable to participate. 
+
+The cluster analysis used Ward's linkage in a agglomerative hierarchical approach. A strenght includes using Ward's linkage that is better for binary data and creates equal group sizes. Another strength is using several clustering approaches, and then deciding to report only one due to similarity between approaches. They used evidence based stopping rule's (Duda's pseudo T and Calinski pseudo F). They were also thoughtful in variable selection, using evidence for reasons. 
+
+Additional weaknesses include the lack of a dengrogram that shows the clustering analysis. They also do not show how many iterations it took to achieve the clustering. They also separated men and women, which could be a strength and a weakness in that there may be patterns that occur regardless of sex, but also patterns that would only occur within genders (which they document in table 2). An additional weakness is the alpha chosen, as they are performing multiple hypothesis testing with their regression models. 
